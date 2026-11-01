@@ -124,6 +124,9 @@ export class ExperimentManager {
         const raw = fs.readFileSync(this.ledgerPath, 'utf-8');
         const list: Experiment[] = JSON.parse(raw);
         for (const exp of list) {
+          if (exp.status === 'running') {
+            exp.status = 'stopped';
+          }
           this.experiments.set(exp.id, exp);
         }
       }
