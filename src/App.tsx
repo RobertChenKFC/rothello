@@ -16,8 +16,15 @@ import { MoveHistory } from './components/MoveHistory';
 import { EnginePanel } from './components/EnginePanel';
 import { Header } from './components/Header';
 import { BotMatchControls } from './components/BotMatchControls';
+import { DashboardView } from './components/Dashboard/DashboardView';
 
 export const App: React.FC = () => {
+  // Default to Fishtest Dashboard as requested
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'arena'>('dashboard');
+  const [experiments, setExperiments] = useState<any[]>([]);
+  const [activeExperiment, setActiveExperiment] = useState<any | null>(null);
+  const [gitInfo, setGitInfo] = useState<any | null>(null);
+
   const [gameState, setGameState] = useState<GameState>(createInitialGameState());
   const [flipped, setFlipped] = useState(false);
   const [availableEngines, setAvailableEngines] = useState<
@@ -79,6 +86,19 @@ export const App: React.FC = () => {
       })
       .catch((err) => console.error('Failed to fetch engines:', err));
 
+    fetch('/api/git-info')
+      .then((res) => res.json())
+      .then((data) => setGitInfo(data))
+      .catch((err) => console.error(err));
+
+    fetch('/api/experiments')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.experiments) setExperiments(data.experiments);
+        if (data.active) setActiveExperiment(data.active);
+      })
+      .catch((err) => console.error(err));
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     const socket = new WebSocket(wsUrl);
@@ -96,6 +116,22 @@ export const App: React.FC = () => {
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+
+        if (msg.type === 'experiment_updated') {
+          setActiveExperiment(msg.experiment);
+          setExperiments((prev) => {
+            const idx = prev.findIndex((e) => e.id === msg.experiment.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = msg.experiment;
+              return updated;
+            } else {
+              return [msg.experiment, ...prev];
+            }
+          });
+          return;
+        }
+
         const engId = msg.engineId || currentEngineId;
         setRawLogs((prev) => [
           ...prev,
@@ -494,6 +530,59 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleStartExperiment = async (params: any) => {
+    try {
+      const res = await fetch('/api/experiments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const exp = await res.json();
+      setActiveExperiment(exp);
+      setExperiments((prev) => [exp, ...prev]);
+    } catch (err) {
+      console.error('Failed to start experiment:', err);
+    }
+  };
+
+  const handleStopExperiment = async () => {
+    try {
+      await fetch('/api/experiments/stop', { method: 'POST' });
+      setActiveExperiment((prev: any) => (prev ? { ...prev, status: 'stopped' } : null));
+    } catch (err) {
+      console.error('Failed to stop experiment:', err);
+    }
+  };
+
+  const handleRunBenchmark = async (engineId: string, depth: number) => {
+    const res = await fetch('/api/benchmark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engineId, depth }),
+    });
+    return await res.json();
+  };
+
+  const handleReplayGame = (ggf: string) => {
+    const moveRegex = /;?([BW])\[([a-h][1-8]|pass|pa|--)\]/gi;
+    let match;
+    let state = createInitialGameState();
+    while ((match = moveRegex.exec(ggf)) !== null) {
+      const alg = match[2].toLowerCase();
+      if (alg === 'pass' || alg === 'pa' || alg === '--') {
+        state = makePass(state);
+      } else {
+        const coord = algebraicToCoord(alg);
+        if (coord) {
+          const next = makeMove(state, coord.row, coord.col);
+          if (next) state = next;
+        }
+      }
+    }
+    setGameState(state);
+    setActiveTab('arena');
+  };
+
   const handleSetDepth = (depth: number) => {
     setGameState((prev) => ({ ...prev, engineDepth: depth }));
     setEngineTelemetry((prev) => ({
@@ -578,8 +667,10 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#161512] text-[#d0d0d0]">
-      {/* Lichess Style Header */}
+      {/* Lichess Style Header with Testing Dashboard Switcher */}
       <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         mode={gameState.mode}
         onModeChange={(m) => {
           setGameState((prev) => ({ ...prev, mode: m }));
@@ -594,130 +685,146 @@ export const App: React.FC = () => {
         winner={gameState.winner}
         blackCount={gameState.blackCount}
         whiteCount={gameState.whiteCount}
+        gitCommit={gitInfo?.commit}
       />
 
-      {/* Main Playing Area */}
+      {/* Main Area: Defaults to Fishtest Testing Dashboard */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col items-center gap-4">
-        {/* Dual Bot Match Control Bar (shown only in Bot Match mode) */}
-        {gameState.mode === 'engine_vs_engine' && (
-          <div className="w-full max-w-5xl">
-            <BotMatchControls
-              availableEngines={availableEngines}
-              blackEngineId={blackBotId}
-              whiteEngineId={whiteBotId}
-              blackDepth={blackBotDepth}
-              whiteDepth={whiteBotDepth}
-              onSelectBlackEngine={handleSelectBlackEngine}
-              onSelectWhiteEngine={handleSelectWhiteEngine}
-              onSelectBlackDepth={handleSelectBlackDepth}
-              onSelectWhiteDepth={handleSelectWhiteDepth}
-              isRunning={isBotMatchRunning}
-              onToggleRunning={() => {
-                setIsBotMatchRunning((prev) => {
-                  if (prev) isEngineMovingRef.current = false;
-                  return !prev;
-                });
-              }}
-              onStepMove={() => {
-                isEngineMovingRef.current = false;
-                handleRequestEngineMove();
-              }}
-              onResetMatch={handleNewGame}
-              moveDelay={botMoveDelay}
-              onMoveDelayChange={setBotMoveDelay}
-            />
-          </div>
+        {activeTab === 'dashboard' ? (
+          <DashboardView
+            availableEngines={availableEngines}
+            experiments={experiments}
+            activeExperiment={activeExperiment}
+            gitInfo={gitInfo}
+            onStartExperiment={handleStartExperiment}
+            onStopExperiment={handleStopExperiment}
+            onReplayGame={handleReplayGame}
+            onRunBenchmark={handleRunBenchmark}
+          />
+        ) : (
+          <>
+            {/* Dual Bot Match Control Bar (shown only in Bot Match mode) */}
+            {gameState.mode === 'engine_vs_engine' && (
+              <div className="w-full max-w-5xl">
+                <BotMatchControls
+                  availableEngines={availableEngines}
+                  blackEngineId={blackBotId}
+                  whiteEngineId={whiteBotId}
+                  blackDepth={blackBotDepth}
+                  whiteDepth={whiteBotDepth}
+                  onSelectBlackEngine={handleSelectBlackEngine}
+                  onSelectWhiteEngine={handleSelectWhiteEngine}
+                  onSelectBlackDepth={handleSelectBlackDepth}
+                  onSelectWhiteDepth={handleSelectWhiteDepth}
+                  isRunning={isBotMatchRunning}
+                  onToggleRunning={() => {
+                    setIsBotMatchRunning((prev) => {
+                      if (prev) isEngineMovingRef.current = false;
+                      return !prev;
+                    });
+                  }}
+                  onStepMove={() => {
+                    isEngineMovingRef.current = false;
+                    handleRequestEngineMove();
+                  }}
+                  onResetMatch={handleNewGame}
+                  moveDelay={botMoveDelay}
+                  onMoveDelayChange={setBotMoveDelay}
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6">
+              {/* Board & Eval Bar Container */}
+              <div className="flex items-center space-x-3">
+                {/* Vertical Lichess Eval Bar */}
+                <EvalBar score={blackEvalScore} flipped={flipped} />
+
+                {/* Board Column with Top and Bottom Player Strips */}
+                <div className="flex flex-col space-y-2">
+                  {/* Top Player Card */}
+                  <PlayerCard
+                    player={topPlayer}
+                    name={getPlayerName(topPlayer)}
+                    count={topPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
+                    isTurn={gameState.currentPlayer === topPlayer && !gameState.isGameOver}
+                    isEngine={isPlayerEngine(topPlayer)}
+                  />
+
+                  {/* Interactive Othello Board */}
+                  <Board
+                    gameState={gameState}
+                    onSquareClick={handleSquareClick}
+                    bestHint={bestHint}
+                    flipped={flipped}
+                  />
+
+                  {/* Bottom Player Card */}
+                  <PlayerCard
+                    player={bottomPlayer}
+                    name={getPlayerName(bottomPlayer)}
+                    count={bottomPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
+                    isTurn={gameState.currentPlayer === bottomPlayer && !gameState.isGameOver}
+                    isEngine={isPlayerEngine(bottomPlayer)}
+                  />
+                </div>
+              </div>
+
+              {/* Right Side Panels: Move History & Engine Telemetry */}
+              <div className="flex flex-col w-[360px] h-[640px] space-y-3">
+                {/* Move History Sheet */}
+                <div className="h-[280px]">
+                  <MoveHistory
+                    gameState={gameState}
+                    onNavigate={handleNavigate}
+                    onNewGame={handleNewGame}
+                    onFlipBoard={() => setFlipped((f) => !f)}
+                  />
+                </div>
+
+                {/* Engine Analysis & Protocol Panel */}
+                <div className="flex-1">
+                  <EnginePanel
+                    engineStatus={activeEngineStatus}
+                    availableEngines={availableEngines}
+                    currentEngineId={currentEngineId}
+                    onSwitchEngine={handleSwitchEngine}
+                    onRequestHint={handleRequestHint}
+                    onRequestEngineMove={handleRequestEngineMove}
+                    onSetDepth={handleSetDepth}
+                    currentDepth={activeDisplayDepth}
+                    rawLogs={rawLogs}
+                    isBotMatch={isBotMatch}
+                    blackBotName={getEngineNameById(blackBotId)}
+                    whiteBotName={getEngineNameById(whiteBotId)}
+                    blackBotTelemetry={{
+                      ...(engineTelemetry[blackBotId] || {
+                        name: blackBotId,
+                        connected: true,
+                        state: 'waiting',
+                        statusText: 'Ready',
+                        hints: [],
+                      }),
+                      depth: blackBotDepth,
+                    }}
+                    whiteBotTelemetry={{
+                      ...(engineTelemetry[whiteBotId] || {
+                        name: whiteBotId,
+                        connected: true,
+                        state: 'waiting',
+                        statusText: 'Ready',
+                        hints: [],
+                      }),
+                      depth: whiteBotDepth,
+                    }}
+                    currentTurn={gameState.currentPlayer}
+                    isBotMatchRunning={isBotMatchRunning}
+                  />
+                </div>
+              </div>
+            </div>
+          </>
         )}
-
-        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6">
-          {/* Board & Eval Bar Container */}
-          <div className="flex items-center space-x-3">
-            {/* Vertical Lichess Eval Bar */}
-            <EvalBar score={blackEvalScore} flipped={flipped} />
-
-            {/* Board Column with Top and Bottom Player Strips */}
-            <div className="flex flex-col space-y-2">
-              {/* Top Player Card */}
-              <PlayerCard
-                player={topPlayer}
-                name={getPlayerName(topPlayer)}
-                count={topPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
-                isTurn={gameState.currentPlayer === topPlayer && !gameState.isGameOver}
-                isEngine={isPlayerEngine(topPlayer)}
-              />
-
-              {/* Interactive Othello Board */}
-              <Board
-                gameState={gameState}
-                onSquareClick={handleSquareClick}
-                bestHint={bestHint}
-                flipped={flipped}
-              />
-
-              {/* Bottom Player Card */}
-              <PlayerCard
-                player={bottomPlayer}
-                name={getPlayerName(bottomPlayer)}
-                count={bottomPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
-                isTurn={gameState.currentPlayer === bottomPlayer && !gameState.isGameOver}
-                isEngine={isPlayerEngine(bottomPlayer)}
-              />
-            </div>
-          </div>
-
-          {/* Right Side Panels: Move History & Engine Telemetry */}
-          <div className="flex flex-col w-[360px] h-[640px] space-y-3">
-            {/* Move History Sheet */}
-            <div className="h-[280px]">
-              <MoveHistory
-                gameState={gameState}
-                onNavigate={handleNavigate}
-                onNewGame={handleNewGame}
-                onFlipBoard={() => setFlipped((f) => !f)}
-              />
-            </div>
-
-            {/* Engine Analysis & Protocol Panel */}
-            <div className="flex-1">
-              <EnginePanel
-                engineStatus={activeEngineStatus}
-                availableEngines={availableEngines}
-                currentEngineId={currentEngineId}
-                onSwitchEngine={handleSwitchEngine}
-                onRequestHint={handleRequestHint}
-                onRequestEngineMove={handleRequestEngineMove}
-                onSetDepth={handleSetDepth}
-                currentDepth={activeDisplayDepth}
-                rawLogs={rawLogs}
-                isBotMatch={isBotMatch}
-                blackBotName={getEngineNameById(blackBotId)}
-                whiteBotName={getEngineNameById(whiteBotId)}
-                blackBotTelemetry={{
-                  ...(engineTelemetry[blackBotId] || {
-                    name: blackBotId,
-                    connected: true,
-                    state: 'waiting',
-                    statusText: 'Ready',
-                    hints: [],
-                  }),
-                  depth: blackBotDepth,
-                }}
-                whiteBotTelemetry={{
-                  ...(engineTelemetry[whiteBotId] || {
-                    name: whiteBotId,
-                    connected: true,
-                    state: 'waiting',
-                    statusText: 'Ready',
-                    hints: [],
-                  }),
-                  depth: whiteBotDepth,
-                }}
-                currentTurn={gameState.currentPlayer}
-                isBotMatchRunning={isBotMatchRunning}
-              />
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

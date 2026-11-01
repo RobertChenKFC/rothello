@@ -5,6 +5,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { NBoardEngineBridge, EngineInfo } from './nboard-bridge';
+import { ExperimentManager } from './runner';
 
 const app = express();
 app.use(cors());
@@ -166,6 +167,44 @@ app.get('/api/engines', (req, res) => {
     };
   });
   res.json({ engines, active: primaryEngineId });
+});
+
+const experimentManager = new ExperimentManager((msg) => broadcast(msg));
+
+app.get('/api/git-info', (req, res) => {
+  res.json(experimentManager.getGitInfo());
+});
+
+app.get('/api/experiments', (req, res) => {
+  res.json({
+    experiments: experimentManager.getExperiments(),
+    active: experimentManager.getActiveExperiment(),
+  });
+});
+
+app.post('/api/experiments', (req, res) => {
+  try {
+    const exp = experimentManager.startExperiment(req.body, getEngine);
+    res.json(exp);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/experiments/stop', (req, res) => {
+  experimentManager.stopCurrentRun();
+  res.json({ status: 'stopped' });
+});
+
+app.post('/api/benchmark', async (req, res) => {
+  try {
+    const engineId = req.body.engineId || 'rothello-rust';
+    const depth = req.body.depth || 6;
+    const report = await experimentManager.runBenchmark(engineId, depth, getEngine);
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3001;
