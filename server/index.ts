@@ -27,6 +27,15 @@ const DEFAULT_ENGINES: EngineInfo[] = [
     depth: 8,
   },
   {
+    id: 'edax',
+    name: 'Edax 4.4 (Native)',
+    type: 'external',
+    path: path.resolve(__dirname, '../tools/edax/bin/lEdax-native'),
+    cwd: path.resolve(__dirname, '../tools/edax/bin'),
+    args: ['-nboard'],
+    depth: 18,
+  },
+  {
     id: 'rothello-rust',
     name: 'Rothello Engine (Rust)',
     type: 'external',
@@ -34,17 +43,10 @@ const DEFAULT_ENGINES: EngineInfo[] = [
     args: ['--nboard'],
     depth: 14,
   },
-  {
-    id: 'edax',
-    name: 'Edax 4.4',
-    type: 'external',
-    path: 'edax',
-    args: ['-nboard'],
-    depth: 18,
-  },
 ];
 
-let bridge = new NBoardEngineBridge(DEFAULT_ENGINES[0]);
+const enginePool = new Map<string, NBoardEngineBridge>();
+let primaryEngineId = 'builtin';
 
 function broadcast(msg: object) {
   const json = JSON.stringify(msg);
@@ -55,59 +57,97 @@ function broadcast(msg: object) {
   });
 }
 
-function attachBridgeEvents(b: NBoardEngineBridge) {
-  b.on('connected', (info) => broadcast({ type: 'engine_connected', ...info }));
-  b.on('name', (data) => broadcast({ type: 'engine_name', ...data }));
-  b.on('status', (data) => broadcast({ type: 'engine_status', ...data }));
-  b.on('move', (data) => broadcast({ type: 'engine_move', ...data }));
-  b.on('hint', (data) => broadcast({ type: 'engine_hint', ...data }));
-  b.on('nodestats', (data) => broadcast({ type: 'engine_nodestats', ...data }));
-  b.on('pong', (data) => broadcast({ type: 'engine_pong', ...data }));
-  b.on('error', (err) => broadcast({ type: 'engine_error', error: err }));
-  b.on('raw', (line) => broadcast({ type: 'engine_raw', line }));
+function attachBridgeEvents(b: NBoardEngineBridge, engineId: string) {
+  b.on('connected', (info) => broadcast({ type: 'engine_connected', engineId, ...info }));
+  b.on('name', (data) => broadcast({ type: 'engine_name', engineId, ...data }));
+  b.on('status', (data) => broadcast({ type: 'engine_status', engineId, ...data }));
+  b.on('move', (data) => broadcast({ type: 'engine_move', engineId, ...data }));
+  b.on('hint', (data) => broadcast({ type: 'engine_hint', engineId, ...data }));
+  b.on('nodestats', (data) => broadcast({ type: 'engine_nodestats', engineId, ...data }));
+  b.on('pong', (data) => broadcast({ type: 'engine_pong', engineId, ...data }));
+  b.on('error', (err) => broadcast({ type: 'engine_error', engineId, error: err }));
+  b.on('raw', (line) => broadcast({ type: 'engine_raw', engineId, line }));
 }
 
-attachBridgeEvents(bridge);
+function getEngine(engineId?: string): NBoardEngineBridge {
+  const id = engineId || primaryEngineId;
+  let b = enginePool.get(id);
+  if (!b) {
+    const config = DEFAULT_ENGINES.find((e) => e.id === id) || DEFAULT_ENGINES[0];
+    b = new NBoardEngineBridge(config);
+    attachBridgeEvents(b, id);
+    enginePool.set(id, b);
+  }
+  return b;
+}
+
+// Pre-initialize default engine
+getEngine('builtin');
 
 wss.on('connection', (ws: WebSocket) => {
-  // Send current engine config on connect
+  const activeEngine = getEngine(primaryEngineId);
   ws.send(
     JSON.stringify({
       type: 'engine_connected',
-      name: bridge.getActiveConfig().name,
-      config: bridge.getActiveConfig(),
+      engineId: primaryEngineId,
+      name: activeEngine.getActiveConfig().name,
+      config: activeEngine.getActiveConfig(),
     })
   );
 
   ws.on('message', (message: string) => {
     try {
       const data = JSON.parse(message.toString());
+      const targetEngine = getEngine(data.engineId);
+
       switch (data.type) {
         case 'set_game':
-          bridge.setGame(data.ggf);
+          // If specific engineId given, sync that one; otherwise sync all active engines in pool
+          if (data.engineId) {
+            targetEngine.setGame(data.ggf);
+          } else {
+            enginePool.forEach((eng) => eng.setGame(data.ggf));
+          }
           break;
+
         case 'send_move':
-          bridge.sendMove(data.algebraic);
+          if (data.engineId) {
+            targetEngine.sendMove(data.algebraic);
+          } else {
+            enginePool.forEach((eng) => eng.sendMove(data.algebraic));
+          }
           break;
+
         case 'request_move':
-          bridge.requestMove();
+          targetEngine.requestMove();
           break;
+
         case 'request_hints':
-          bridge.requestHints(data.count || 5);
+          targetEngine.requestHints(data.count || 5);
           break;
+
         case 'set_depth':
-          bridge.setDepth(data.depth);
+          targetEngine.setDepth(data.depth);
           break;
+
         case 'ping':
-          bridge.ping();
+          targetEngine.ping();
           break;
+
         case 'raw_command':
-          bridge.sendCommand(data.command);
+          targetEngine.sendCommand(data.command);
           break;
+
         case 'switch_engine': {
           const config = data.config as EngineInfo;
-          bridge.switchEngine(config);
-          attachBridgeEvents(bridge);
+          primaryEngineId = config.id;
+          const eng = getEngine(config.id);
+          broadcast({
+            type: 'engine_connected',
+            engineId: config.id,
+            name: eng.getActiveConfig().name,
+            config: eng.getActiveConfig(),
+          });
           break;
         }
       }
@@ -120,13 +160,13 @@ wss.on('connection', (ws: WebSocket) => {
 app.get('/api/engines', (req, res) => {
   const engines = DEFAULT_ENGINES.map((e) => {
     const isAvailable =
-      e.type === 'builtin' || (e.path ? fs.existsSync(e.path) || e.path === 'edax' : false);
+      e.type === 'builtin' || (e.path ? fs.existsSync(e.path) : false);
     return {
       ...e,
       available: isAvailable,
     };
   });
-  res.json({ engines, active: bridge.getActiveConfig().id });
+  res.json({ engines, active: primaryEngineId });
 });
 
 const PORT = process.env.PORT || 3001;

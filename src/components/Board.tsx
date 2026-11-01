@@ -18,18 +18,12 @@ export const Board: React.FC<BoardProps> = ({
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const starIndices = new Set([
-    coordToIndex(2, 2), // c3
-    coordToIndex(2, 5), // f3
-    coordToIndex(5, 2), // c6
-    coordToIndex(5, 5), // f6
-  ]);
-
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
   const ranks = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
+  // In Othello standard notation, rank 1 is at the top, rank 8 is at the bottom
   const displayFiles = flipped ? [...files].reverse() : files;
-  const displayRanks = flipped ? ranks : [...ranks].reverse();
+  const displayRanks = flipped ? [...ranks].reverse() : ranks;
 
   // Find index of best hint move if any
   let bestHintIdx: number | null = null;
@@ -62,6 +56,12 @@ export const Board: React.FC<BoardProps> = ({
         className="w-[540px] h-[540px] grid grid-cols-8 grid-rows-8 bg-[#1e5838] border-2 border-[#0f271a] shadow-inner relative"
         onMouseLeave={() => setHoveredIndex(null)}
       >
+        {/* 4 Tournament Grid Intersection Dots framing the 4x4 center area */}
+        <div className="absolute top-[25%] left-[25%] -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#0a1e13] border border-[#2a6645] pointer-events-none z-10 shadow-sm" />
+        <div className="absolute top-[25%] left-[75%] -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#0a1e13] border border-[#2a6645] pointer-events-none z-10 shadow-sm" />
+        <div className="absolute top-[75%] left-[25%] -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#0a1e13] border border-[#2a6645] pointer-events-none z-10 shadow-sm" />
+        <div className="absolute top-[75%] left-[75%] -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#0a1e13] border border-[#2a6645] pointer-events-none z-10 shadow-sm" />
+
         {Array.from({ length: 64 }).map((_, displayIdx) => {
           const displayRow = Math.floor(displayIdx / 8);
           const displayCol = displayIdx % 8;
@@ -72,7 +72,6 @@ export const Board: React.FC<BoardProps> = ({
 
           const disc = gameState.board[idx];
           const isLegal = !!gameState.legalMoves[idx];
-          const isStar = starIndices.has(idx);
           const isLastMove = lastMoveIdx === idx;
           const isBestHint = bestHintIdx === idx;
           const isHovered = hoveredIndex === idx;
@@ -87,11 +86,6 @@ export const Board: React.FC<BoardProps> = ({
                 isLegal ? 'hover:bg-[#256e46]' : 'cursor-default'
               }`}
             >
-              {/* Star dot guide */}
-              {isStar && disc === 0 && (
-                <div className="w-1.5 h-1.5 rounded-full bg-[#112e1e] pointer-events-none" />
-              )}
-
               {/* Coordinate label: Top-left of rank 1 or file a */}
               {displayCol === 0 && (
                 <span className="absolute top-0.5 left-1 text-[9px] font-semibold text-[#8eb59c] pointer-events-none">
@@ -120,8 +114,8 @@ export const Board: React.FC<BoardProps> = ({
                 <div
                   className={`rounded-full transition-all duration-200 ${
                     isBestHint
-                      ? 'w-4 h-4 bg-yellow-400/80 shadow-[0_0_8px_rgba(250,204,21,0.8)]'
-                      : 'w-3 h-3 bg-white/20 hover:bg-white/40'
+                      ? 'w-4 h-4 bg-yellow-400/90 shadow-[0_0_8px_rgba(250,204,21,0.9)] ring-2 ring-yellow-300/40'
+                      : 'w-3 h-3 bg-white/30 hover:bg-white/50'
                   }`}
                 />
               )}

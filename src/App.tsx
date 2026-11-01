@@ -13,6 +13,7 @@ import { PlayerCard } from './components/PlayerCard';
 import { MoveHistory } from './components/MoveHistory';
 import { EnginePanel } from './components/EnginePanel';
 import { Header } from './components/Header';
+import { BotMatchControls } from './components/BotMatchControls';
 
 export const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(createInitialGameState());
@@ -20,11 +21,19 @@ export const App: React.FC = () => {
   const [availableEngines, setAvailableEngines] = useState<
     { id: string; name: string; available: boolean; type: string }[]
   >([]);
-  const [currentEngineId, setCurrentEngineId] = useState('builtin');
+  const [currentEngineId, setCurrentEngineId] = useState('edax');
   const [rawLogs, setRawLogs] = useState<string[]>([]);
 
+  // Bot Match dual engine states
+  const [blackBotId, setBlackBotId] = useState('edax');
+  const [whiteBotId, setWhiteBotId] = useState('builtin');
+  const [blackBotDepth, setBlackBotDepth] = useState(14);
+  const [whiteBotDepth, setWhiteBotDepth] = useState(8);
+  const [isBotMatchRunning, setIsBotMatchRunning] = useState(false);
+  const [botMoveDelay, setBotMoveDelay] = useState(350);
+
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({
-    name: 'Rothello Reference Engine',
+    name: 'Edax 4.4 (Native)',
     connected: false,
     state: 'idle',
     statusText: 'Connecting to protocol server...',
@@ -40,8 +49,14 @@ export const App: React.FC = () => {
     fetch('/api/engines')
       .then((res) => res.json())
       .then((data) => {
-        if (data.engines) setAvailableEngines(data.engines);
-        if (data.active) setCurrentEngineId(data.active);
+        if (data.engines) {
+          setAvailableEngines(data.engines);
+          // Prefer edax if available, else builtin
+          const edaxAvailable = data.engines.find((e: any) => e.id === 'edax' && e.available);
+          const initialId = edaxAvailable ? 'edax' : 'builtin';
+          setCurrentEngineId(initialId);
+          setBlackBotId(initialId);
+        }
       })
       .catch((err) => console.error('Failed to fetch engines:', err));
 
@@ -58,14 +73,14 @@ export const App: React.FC = () => {
         statusText: 'Connected to NBoard bridge',
       }));
       setRawLogs((prev) => [...prev, '[WS] Connected to NBoard bridge']);
-      // Send initial game state
+      // Send initial game state to all engines
       socket.send(JSON.stringify({ type: 'set_game', ggf: toGGF(gameState) }));
     };
 
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        setRawLogs((prev) => [...prev, `<< ${JSON.stringify(msg)}`]);
+        setRawLogs((prev) => [...prev, `<< [${msg.engineId || 'srv'}] ${msg.type} ${msg.move || msg.nodes || ''}`]);
 
         switch (msg.type) {
           case 'engine_connected':
@@ -79,7 +94,9 @@ export const App: React.FC = () => {
             break;
 
           case 'engine_name':
-            setEngineStatus((prev) => ({ ...prev, name: msg.engineName }));
+            if (!msg.engineId || msg.engineId === currentEngineId) {
+              setEngineStatus((prev) => ({ ...prev, name: msg.engineName || prev.name }));
+            }
             break;
 
           case 'engine_status':
@@ -180,14 +197,16 @@ export const App: React.FC = () => {
         // Clear previous hints for new position
         setEngineStatus((prev) => ({ ...prev, hints: [] }));
 
-        // If in analysis mode, request hints
+        // If in analysis mode, request hints from active engine
         if (state.mode === 'analysis') {
-          wsRef.current.send(JSON.stringify({ type: 'request_hints', count: 5 }));
-          setRawLogs((prev) => [...prev, '>> hint 5']);
+          wsRef.current.send(
+            JSON.stringify({ type: 'request_hints', engineId: currentEngineId, count: 5 })
+          );
+          setRawLogs((prev) => [...prev, `>> [${currentEngineId}] hint 5`]);
         }
       }
     },
-    []
+    [currentEngineId]
   );
 
   useEffect(() => {
@@ -198,22 +217,64 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (gameState.isGameOver) return;
 
-    const isEngineTurn =
-      (gameState.mode === 'human_vs_engine' &&
-        gameState.currentPlayer !== gameState.userColor) ||
-      gameState.mode === 'engine_vs_engine';
+    if (gameState.mode === 'human_vs_engine') {
+      const isEngineTurn = gameState.currentPlayer !== gameState.userColor;
+      if (isEngineTurn && !isEngineMovingRef.current) {
+        isEngineMovingRef.current = true;
+        const timer = setTimeout(() => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'request_move',
+                engineId: currentEngineId,
+              })
+            );
+            setRawLogs((prev) => [...prev, `>> [${currentEngineId}] go`]);
+          }
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    } else if (gameState.mode === 'engine_vs_engine' && isBotMatchRunning) {
+      if (!isEngineMovingRef.current) {
+        isEngineMovingRef.current = true;
+        const activeBotId = gameState.currentPlayer === 1 ? blackBotId : whiteBotId;
+        const activeDepth = gameState.currentPlayer === 1 ? blackBotDepth : whiteBotDepth;
 
-    if (isEngineTurn && !isEngineMovingRef.current) {
-      isEngineMovingRef.current = true;
-      const timer = setTimeout(() => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'request_move' }));
-          setRawLogs((prev) => [...prev, '>> go']);
-        }
-      }, 350);
-      return () => clearTimeout(timer);
+        const timer = setTimeout(() => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            // Ensure depth is set
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'set_depth',
+                engineId: activeBotId,
+                depth: activeDepth,
+              })
+            );
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'request_move',
+                engineId: activeBotId,
+              })
+            );
+            setRawLogs((prev) => [...prev, `>> [${activeBotId} (d=${activeDepth})] go`]);
+          }
+        }, botMoveDelay);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [gameState.currentPlayer, gameState.mode, gameState.userColor, gameState.isGameOver]);
+  }, [
+    gameState.currentPlayer,
+    gameState.mode,
+    gameState.userColor,
+    gameState.isGameOver,
+    isBotMatchRunning,
+    blackBotId,
+    whiteBotId,
+    blackBotDepth,
+    whiteBotDepth,
+    botMoveDelay,
+    currentEngineId,
+  ]);
 
   const handleSquareClick = (row: number, col: number) => {
     if (gameState.isGameOver) return;
@@ -245,6 +306,7 @@ export const App: React.FC = () => {
     fresh.engineDepth = gameState.engineDepth;
     setGameState(fresh);
     setEngineStatus((prev) => ({ ...prev, hints: [] }));
+    isEngineMovingRef.current = false;
   };
 
   const handleSwitchEngine = (engineId: string) => {
@@ -259,23 +321,32 @@ export const App: React.FC = () => {
 
   const handleRequestHint = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'request_hints', count: 5 }));
-      setRawLogs((prev) => [...prev, '>> hint 5']);
+      wsRef.current.send(
+        JSON.stringify({ type: 'request_hints', engineId: currentEngineId, count: 5 })
+      );
+      setRawLogs((prev) => [...prev, `>> [${currentEngineId}] hint 5`]);
     }
   };
 
   const handleRequestEngineMove = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'request_move' }));
-      setRawLogs((prev) => [...prev, '>> go']);
+      const targetEngine =
+        gameState.mode === 'engine_vs_engine'
+          ? gameState.currentPlayer === 1
+            ? blackBotId
+            : whiteBotId
+          : currentEngineId;
+
+      wsRef.current.send(JSON.stringify({ type: 'request_move', engineId: targetEngine }));
+      setRawLogs((prev) => [...prev, `>> [${targetEngine}] go`]);
     }
   };
 
   const handleSetDepth = (depth: number) => {
     setGameState((prev) => ({ ...prev, engineDepth: depth }));
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'set_depth', depth }));
-      setRawLogs((prev) => [...prev, `>> depth ${depth}`]);
+      wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: currentEngineId, depth }));
+      setRawLogs((prev) => [...prev, `>> [${currentEngineId}] depth ${depth}`]);
     }
   };
 
@@ -310,12 +381,19 @@ export const App: React.FC = () => {
   const topPlayer: Player = flipped ? 1 : -1;
   const bottomPlayer: Player = flipped ? -1 : 1;
 
+  const getEngineNameById = (id: string) => {
+    const found = availableEngines.find((e) => e.id === id);
+    return found ? found.name : id;
+  };
+
   const getPlayerName = (color: Player) => {
     if (gameState.mode === 'human_vs_engine') {
-      return color === gameState.userColor ? 'Player' : engineStatus.name;
+      return color === gameState.userColor ? 'Player' : getEngineNameById(currentEngineId);
     }
     if (gameState.mode === 'engine_vs_engine') {
-      return color === 1 ? `${engineStatus.name} (Black)` : `${engineStatus.name} (White)`;
+      return color === 1
+        ? `${getEngineNameById(blackBotId)} (d=${blackBotDepth})`
+        : `${getEngineNameById(whiteBotId)} (d=${whiteBotDepth})`;
     }
     return color === 1 ? 'Black' : 'White';
   };
@@ -333,7 +411,10 @@ export const App: React.FC = () => {
       {/* Lichess Style Header */}
       <Header
         mode={gameState.mode}
-        onModeChange={(m) => setGameState((prev) => ({ ...prev, mode: m }))}
+        onModeChange={(m) => {
+          setGameState((prev) => ({ ...prev, mode: m }));
+          if (m !== 'engine_vs_engine') setIsBotMatchRunning(false);
+        }}
         userColor={gameState.userColor}
         onUserColorChange={(c) => {
           setGameState((prev) => ({ ...prev, userColor: c }));
@@ -346,67 +427,92 @@ export const App: React.FC = () => {
       />
 
       {/* Main Playing Area */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6">
-        {/* Board & Eval Bar Container */}
-        <div className="flex items-center space-x-3">
-          {/* Vertical Lichess Eval Bar */}
-          <EvalBar score={blackEvalScore} flipped={flipped} />
-
-          {/* Board Column with Top and Bottom Player Strips */}
-          <div className="flex flex-col space-y-2">
-            {/* Top Player Card */}
-            <PlayerCard
-              player={topPlayer}
-              name={getPlayerName(topPlayer)}
-              count={topPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
-              isTurn={gameState.currentPlayer === topPlayer && !gameState.isGameOver}
-              isEngine={isPlayerEngine(topPlayer)}
-            />
-
-            {/* Interactive Othello Board */}
-            <Board
-              gameState={gameState}
-              onSquareClick={handleSquareClick}
-              bestHint={bestHint}
-              flipped={flipped}
-            />
-
-            {/* Bottom Player Card */}
-            <PlayerCard
-              player={bottomPlayer}
-              name={getPlayerName(bottomPlayer)}
-              count={bottomPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
-              isTurn={gameState.currentPlayer === bottomPlayer && !gameState.isGameOver}
-              isEngine={isPlayerEngine(bottomPlayer)}
-            />
-          </div>
-        </div>
-
-        {/* Right Side Panels: Move History & Engine Telemetry */}
-        <div className="flex flex-col w-[360px] h-[640px] space-y-3">
-          {/* Move History Sheet */}
-          <div className="h-[280px]">
-            <MoveHistory
-              gameState={gameState}
-              onNavigate={handleNavigate}
-              onNewGame={handleNewGame}
-              onFlipBoard={() => setFlipped((f) => !f)}
-            />
-          </div>
-
-          {/* Engine Analysis & Protocol Panel */}
-          <div className="flex-1">
-            <EnginePanel
-              engineStatus={engineStatus}
+      <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col items-center gap-4">
+        {/* Dual Bot Match Control Bar (shown only in Bot Match mode) */}
+        {gameState.mode === 'engine_vs_engine' && (
+          <div className="w-full max-w-4xl">
+            <BotMatchControls
               availableEngines={availableEngines}
-              currentEngineId={currentEngineId}
-              onSwitchEngine={handleSwitchEngine}
-              onRequestHint={handleRequestHint}
-              onRequestEngineMove={handleRequestEngineMove}
-              onSetDepth={handleSetDepth}
-              currentDepth={gameState.engineDepth}
-              rawLogs={rawLogs}
+              blackEngineId={blackBotId}
+              whiteEngineId={whiteBotId}
+              blackDepth={blackBotDepth}
+              whiteDepth={whiteBotDepth}
+              onSelectBlackEngine={setBlackBotId}
+              onSelectWhiteEngine={setWhiteBotId}
+              onSelectBlackDepth={setBlackBotDepth}
+              onSelectWhiteDepth={setWhiteBotDepth}
+              isRunning={isBotMatchRunning}
+              onToggleRunning={() => setIsBotMatchRunning(!isBotMatchRunning)}
+              onStepMove={handleRequestEngineMove}
+              onResetMatch={handleNewGame}
+              moveDelay={botMoveDelay}
+              onMoveDelayChange={setBotMoveDelay}
             />
+          </div>
+        )}
+
+        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6">
+          {/* Board & Eval Bar Container */}
+          <div className="flex items-center space-x-3">
+            {/* Vertical Lichess Eval Bar */}
+            <EvalBar score={blackEvalScore} flipped={flipped} />
+
+            {/* Board Column with Top and Bottom Player Strips */}
+            <div className="flex flex-col space-y-2">
+              {/* Top Player Card */}
+              <PlayerCard
+                player={topPlayer}
+                name={getPlayerName(topPlayer)}
+                count={topPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
+                isTurn={gameState.currentPlayer === topPlayer && !gameState.isGameOver}
+                isEngine={isPlayerEngine(topPlayer)}
+              />
+
+              {/* Interactive Othello Board */}
+              <Board
+                gameState={gameState}
+                onSquareClick={handleSquareClick}
+                bestHint={bestHint}
+                flipped={flipped}
+              />
+
+              {/* Bottom Player Card */}
+              <PlayerCard
+                player={bottomPlayer}
+                name={getPlayerName(bottomPlayer)}
+                count={bottomPlayer === 1 ? gameState.blackCount : gameState.whiteCount}
+                isTurn={gameState.currentPlayer === bottomPlayer && !gameState.isGameOver}
+                isEngine={isPlayerEngine(bottomPlayer)}
+              />
+            </div>
+          </div>
+
+          {/* Right Side Panels: Move History & Engine Telemetry */}
+          <div className="flex flex-col w-[360px] h-[640px] space-y-3">
+            {/* Move History Sheet */}
+            <div className="h-[280px]">
+              <MoveHistory
+                gameState={gameState}
+                onNavigate={handleNavigate}
+                onNewGame={handleNewGame}
+                onFlipBoard={() => setFlipped((f) => !f)}
+              />
+            </div>
+
+            {/* Engine Analysis & Protocol Panel */}
+            <div className="flex-1">
+              <EnginePanel
+                engineStatus={engineStatus}
+                availableEngines={availableEngines}
+                currentEngineId={currentEngineId}
+                onSwitchEngine={handleSwitchEngine}
+                onRequestHint={handleRequestHint}
+                onRequestEngineMove={handleRequestEngineMove}
+                onSetDepth={handleSetDepth}
+                currentDepth={gameState.engineDepth}
+                rawLogs={rawLogs}
+              />
+            </div>
           </div>
         </div>
       </main>

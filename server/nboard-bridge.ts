@@ -7,6 +7,7 @@ export interface EngineInfo {
   name: string;
   type: 'builtin' | 'external';
   path?: string;
+  cwd?: string;
   args?: string[];
   depth?: number;
 }
@@ -45,7 +46,9 @@ export class NBoardEngineBridge extends EventEmitter {
     } else if (this.activeConfig.path) {
       try {
         const args = this.activeConfig.args || ['-nboard'];
-        this.engineProcess = spawn(this.activeConfig.path, args);
+        this.engineProcess = spawn(this.activeConfig.path, args, {
+          cwd: this.activeConfig.cwd,
+        });
 
         this.engineProcess.stdout.on('data', (data: Buffer) => {
           this.buffer += data.toString('utf-8');
@@ -164,9 +167,9 @@ export class NBoardEngineBridge extends EventEmitter {
     if (line.startsWith('search ') || line.startsWith('book ')) {
       const isBook = line.startsWith('book ');
       const parts = line.split(/\s+/);
-      // e.g. ["search", "c4", "+2.0", "0", "12"]
+      // e.g. ["search", "f5D6c3D3", "-1", "0", "24"] or ["book", "d3", "-1", "0", "24"]
       const pv = parts[1] || '';
-      const move = pv.split('/')[0] || pv;
+      const move = pv.length >= 2 ? pv.substring(0, 2).toLowerCase() : pv;
       const score = parseFloat(parts[2]) || 0;
       const nGames = parseInt(parts[3], 10) || 0;
       const depth = parseInt(parts[4], 10) || 0;
