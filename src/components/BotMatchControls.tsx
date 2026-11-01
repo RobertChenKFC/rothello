@@ -44,7 +44,7 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
   onMoveDelayChange,
 }) => {
   return (
-    <div className="w-full bg-[#1e1c18] border border-[#312e29] rounded-lg p-2.5 shadow-md flex flex-wrap items-center justify-between gap-3 text-xs select-none">
+    <div className="w-full bg-[#1e1c18] border border-[#312e29] rounded-lg p-2.5 shadow-md flex flex-wrap items-center justify-between gap-3 text-xs">
       {/* Bot Selectors Group */}
       <div className="flex items-center flex-wrap gap-2">
         {/* Black Bot */}

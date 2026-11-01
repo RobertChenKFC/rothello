@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   gitCommit,
 }) => {
   return (
-    <header className="w-full bg-[#1e1c18] border-b border-[#312e29] px-6 py-2.5 flex items-center justify-between shadow-md select-none">
+    <header className="w-full bg-[#1e1c18] border-b border-[#312e29] px-6 py-2.5 flex items-center justify-between shadow-md">
       {/* Brand & Primary Navigation Switcher */}
       <div className="flex items-center space-x-6">
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onTabChange('dashboard')}>

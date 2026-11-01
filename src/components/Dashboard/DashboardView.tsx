@@ -23,6 +23,7 @@ export interface ExperimentStats {
   losses: number;
   winRate: number;
   elo: number;
+  estimatedElo?: number;
   eloError: number;
   llr: number;
   pentanomial: {
@@ -114,6 +115,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     (max, e) => (e.stats.elo > max ? e.stats.elo : max),
     0
   );
+  const bestEstimatedElo = experiments.reduce((max, e) => {
+    const est = e.stats.estimatedElo ?? Math.round(1500 + e.stats.elo);
+    return est > max ? est : max;
+  }, 1500);
 
   const handleRunDiagnostic = async () => {
     setIsBenchmarkRunning(true);
@@ -187,10 +192,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div>
               <div className="text-[10px] uppercase font-bold text-gray-500">
-                Best Tested ΔElo
+                Peak Estimated Elo
               </div>
               <div className="text-lg font-bold font-mono text-green-400">
-                {bestElo > 0 ? `+${bestElo.toFixed(1)}` : '0.0'}
+                ~{bestEstimatedElo}
+                <span className="text-xs text-gray-400 font-normal ml-1.5 font-mono">
+                  ({bestElo > 0 ? `+${bestElo.toFixed(0)}` : '0'} ΔElo)
+                </span>
               </div>
             </div>
           </div>
@@ -387,23 +395,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Elo & W-D-L Statistics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Elo Difference & Confidence Interval */}
+            {/* Estimated Elo & Delta Elo Card */}
             <div className="bg-[#141311] border border-[#2d2a25] p-3 rounded-lg text-center flex flex-col justify-center">
               <div className="text-[10px] uppercase font-bold text-gray-500">
-                ΔElo (vs Baseline)
+                Estimated Elo
               </div>
-              <div
-                className={`text-2xl font-bold font-mono mt-1 ${
-                  displayExp.stats.elo > 0
-                    ? 'text-green-400'
-                    : displayExp.stats.elo < 0
-                    ? 'text-red-400'
-                    : 'text-gray-300'
-                }`}
-              >
-                {displayExp.stats.elo > 0 ? `+${displayExp.stats.elo.toFixed(1)}` : displayExp.stats.elo.toFixed(1)}
+              <div className="text-2xl font-bold font-mono mt-1 text-yellow-400">
+                ~{displayExp.stats.estimatedElo ?? Math.round(1500 + displayExp.stats.elo)}
               </div>
               <div className="text-[11px] font-mono text-gray-400 mt-0.5">
+                <span
+                  className={
+                    displayExp.stats.elo > 0
+                      ? 'text-green-400'
+                      : displayExp.stats.elo < 0
+                      ? 'text-red-400'
+                      : 'text-gray-300'
+                  }
+                >
+                  ΔElo: {displayExp.stats.elo > 0 ? `+${displayExp.stats.elo.toFixed(1)}` : displayExp.stats.elo.toFixed(1)}
+                </span>{' '}
                 ± {displayExp.stats.eloError.toFixed(1)} (95% CI)
               </div>
             </div>
@@ -606,6 +617,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <th className="py-2 px-3">Candidate</th>
                   <th className="py-2 px-3">Baseline</th>
                   <th className="py-2 px-3 text-center">Games</th>
+                  <th className="py-2 px-3 text-center">Estimated Elo</th>
                   <th className="py-2 px-3 text-center">ΔElo ± CI</th>
                   <th className="py-2 px-3 text-center">Status</th>
                   <th className="py-2 px-3 text-right">Action</th>
@@ -636,6 +648,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
                     <td className="py-2 px-3 text-center font-bold text-white">
                       {exp.stats.totalGames}
+                    </td>
+                    <td className="py-2 px-3 text-center font-bold text-yellow-400">
+                      ~{exp.stats.estimatedElo ?? Math.round(1500 + exp.stats.elo)}
                     </td>
                     <td className="py-2 px-3 text-center font-bold">
                       <span

@@ -19,6 +19,7 @@ interface NewExperimentModalProps {
     candidateDepth: number;
     baselineEngineId: string;
     baselineDepth: number;
+    baselineAnchorElo: number;
     elo0: number;
     elo1: number;
     type: 'sprt' | 'fixed_games';
@@ -36,8 +37,9 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
   const [name, setName] = useState('');
   const [candidateEngineId, setCandidateEngineId] = useState('rothello-rust');
   const [candidateDepth, setCandidateDepth] = useState(6);
-  const [baselineEngineId, setBaselineEngineId] = useState('builtin');
-  const [baselineDepth, setBaselineDepth] = useState(6);
+  const [baselineEngineId, setBaselineEngineId] = useState('rothello-rust');
+  const [baselineDepth, setBaselineDepth] = useState(4);
+  const [baselineAnchorElo, setBaselineAnchorElo] = useState(1500);
   const [testType, setTestType] = useState<'sprt' | 'fixed_games'>('sprt');
   const [elo0, setElo0] = useState(0.0);
   const [elo1, setElo1] = useState(5.0);
@@ -48,11 +50,14 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onStartExperiment({
-      name: name.trim() || `Test ${gitInfo?.commit || 'Run'} vs ${baselineEngineId}`,
+      name:
+        name.trim() ||
+        `Self-Play: Rust d=${candidateDepth} vs ${baselineEngineId === 'rothello-rust' ? `Rust d=${baselineDepth}` : baselineEngineId}`,
       candidateEngineId,
       candidateDepth,
       baselineEngineId,
       baselineDepth,
+      baselineAnchorElo,
       elo0,
       elo1,
       type: testType,
@@ -172,16 +177,31 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-1">Search Depth</label>
-                <input
-                  type="number"
-                  min={2}
-                  max={20}
-                  value={baselineDepth}
-                  onChange={(e) => setBaselineDepth(parseInt(e.target.value, 10) || 6)}
-                  className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-500 block mb-1">Depth</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={20}
+                    value={baselineDepth}
+                    onChange={(e) => setBaselineDepth(parseInt(e.target.value, 10) || 6)}
+                    className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 block mb-1">Anchor Elo</label>
+                  <input
+                    type="number"
+                    min={100}
+                    max={4000}
+                    step={50}
+                    value={baselineAnchorElo}
+                    onChange={(e) => setBaselineAnchorElo(parseInt(e.target.value, 10) || 1500)}
+                    className="w-full bg-[#24211d] text-yellow-400 font-mono rounded px-2 py-1 border border-[#38342e]"
+                    title="Reference baseline rating to estimate absolute candidate Elo"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -16,6 +16,7 @@ export interface SprtResult {
   upperBound: number;
   status: 'running' | 'passed' | 'failed';
   elo: number;
+  estimatedElo: number;
   eloError: number; // 95% confidence interval margin (+/-)
   eloMin: number;
   eloMax: number;
@@ -77,7 +78,12 @@ export class SprtCalculator {
   /**
    * Calculates Log-Likelihood Ratio (LLR), Elo difference, and 95% CI from W/D/L.
    */
-  public calculate(wins: number, draws: number, losses: number): SprtResult {
+  public calculate(
+    wins: number,
+    draws: number,
+    losses: number,
+    anchorElo: number = 1500
+  ): SprtResult {
     const totalGames = wins + draws + losses;
     if (totalGames === 0) {
       return {
@@ -86,6 +92,7 @@ export class SprtCalculator {
         upperBound: this.upperBound,
         status: 'running',
         elo: 0,
+        estimatedElo: anchorElo,
         eloError: 0,
         eloMin: 0,
         eloMax: 0,
@@ -134,12 +141,16 @@ export class SprtCalculator {
       status = 'failed';
     }
 
+    const cleanElo = isFinite(elo) ? elo : 0;
+    const estimatedElo = Math.round(anchorElo + cleanElo);
+
     return {
       llr,
       lowerBound: this.lowerBound,
       upperBound: this.upperBound,
       status,
-      elo: isFinite(elo) ? elo : 0,
+      elo: cleanElo,
+      estimatedElo,
       eloError: isFinite(eloError) ? eloError : 0,
       eloMin: isFinite(eloMin) ? eloMin : -100,
       eloMax: isFinite(eloMax) ? eloMax : 100,

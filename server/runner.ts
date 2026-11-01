@@ -74,6 +74,8 @@ export interface Experiment {
     upperBound: number;
   };
 
+  baselineAnchorElo: number; // Anchor baseline rating, default 1500
+
   stats: {
     totalGames: number;
     wins: number;
@@ -81,6 +83,7 @@ export interface Experiment {
     losses: number;
     winRate: number;
     elo: number;
+    estimatedElo: number; // Candidate absolute estimated Elo
     eloError: number;
     llr: number;
     pentanomial: PentanomialStats;
@@ -217,6 +220,7 @@ export class ExperimentManager {
       params.baselineDepth ?? params.baseline?.depth ?? 6;
     const elo0 = params.elo0 ?? params.sprtBounds?.elo0 ?? 0.0;
     const elo1 = params.elo1 ?? params.sprtBounds?.elo1 ?? 5.0;
+    const baselineAnchorElo = params.baselineAnchorElo ?? 1500;
     const type =
       params.type ||
       (params.testType === 'fixed' || params.maxPairs ? 'fixed_games' : 'sprt');
@@ -260,6 +264,7 @@ export class ExperimentManager {
         lowerBound: bounds.lowerBound,
         upperBound: bounds.upperBound,
       },
+      baselineAnchorElo,
       stats: {
         totalGames: 0,
         wins: 0,
@@ -267,6 +272,7 @@ export class ExperimentManager {
         losses: 0,
         winRate: 0.5,
         elo: 0,
+        estimatedElo: baselineAnchorElo,
         eloError: 0,
         llr: 0,
         pentanomial: { ww: 0, wd: 0, wlOrDd: 0, ld: 0, ll: 0 },
@@ -380,11 +386,13 @@ export class ExperimentManager {
         const sprtResult = sprt.calculate(
           exp.stats.wins,
           exp.stats.draws,
-          exp.stats.losses
+          exp.stats.losses,
+          exp.baselineAnchorElo ?? 1500
         );
 
         exp.stats.llr = sprtResult.llr;
         exp.stats.elo = sprtResult.elo;
+        exp.stats.estimatedElo = sprtResult.estimatedElo;
         exp.stats.eloError = sprtResult.eloError;
         exp.stats.winRate = sprtResult.winRate;
 
