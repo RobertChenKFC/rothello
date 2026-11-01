@@ -118,6 +118,10 @@ export class NBoardEngineBridge extends EventEmitter {
     this.sendCommand(`depth ${depth}`);
   }
 
+  public setTimeLimit(timeSec: number) {
+    this.sendCommand(`time ${timeSec}`);
+  }
+
   private handleEngineLine(rawLine: string) {
     const line = rawLine.trim();
     if (!line) return;

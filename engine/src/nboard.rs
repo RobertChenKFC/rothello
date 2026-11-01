@@ -7,6 +7,7 @@ pub struct NBoardLoop {
     board: Board,
     searcher: Searcher,
     depth: u8,
+    time_limit_sec: Option<f64>,
     name: String,
 }
 
@@ -16,6 +17,7 @@ impl NBoardLoop {
             board: Board::new(),
             searcher: Searcher::new(),
             depth: 10,
+            time_limit_sec: None,
             name: "Rothello-Rust".to_string(),
         }
     }
@@ -48,8 +50,17 @@ impl NBoardLoop {
                     if let Some(d_str) = parts.get(1) {
                         if let Ok(d) = d_str.parse::<u8>() {
                             self.depth = d.clamp(1, 24);
+                            self.time_limit_sec = None; // Explicit depth clears time limit
                             writeln!(stdout, "set myname {} {}", self.name, self.depth).unwrap();
                             stdout.flush().unwrap();
+                        }
+                    }
+                }
+
+                "time" => {
+                    if let Some(t_str) = parts.get(1) {
+                        if let Ok(t) = t_str.parse::<f64>() {
+                            self.time_limit_sec = if t > 0.001 { Some(t) } else { None };
                         }
                     }
                 }
@@ -63,8 +74,13 @@ impl NBoardLoop {
                     } else if parts.len() >= 3 && parts[1] == "depth" {
                         if let Ok(d) = parts[2].parse::<u8>() {
                             self.depth = d.clamp(1, 24);
+                            self.time_limit_sec = None;
                             writeln!(stdout, "set myname {} {}", self.name, self.depth).unwrap();
                             stdout.flush().unwrap();
+                        }
+                    } else if parts.len() >= 3 && parts[1] == "time" {
+                        if let Ok(t) = parts[2].parse::<f64>() {
+                            self.time_limit_sec = if t > 0.001 { Some(t) } else { None };
                         }
                     }
                 }
@@ -73,7 +89,8 @@ impl NBoardLoop {
                     writeln!(stdout, "status {} is thinking", self.name).unwrap();
                     stdout.flush().unwrap();
 
-                    let res = self.searcher.search(&self.board, self.depth, None, None);
+                    let search_depth = if self.time_limit_sec.is_some() { 24 } else { self.depth };
+                    let res = self.searcher.search(&self.board, search_depth, self.time_limit_sec, None);
 
                     writeln!(stdout, "nodestats {} {:.3}", res.nodes, res.time_sec).unwrap();
                     let move_str = match res.best_move {

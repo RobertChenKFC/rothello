@@ -58,13 +58,17 @@ export interface Experiment {
   candidate: {
     engineId: string;
     name: string;
-    depth: number;
+    controlType: 'depth' | 'time';
+    depth?: number;
+    timeMs?: number;
   };
 
   baseline: {
     engineId: string;
     name: string;
-    depth: number;
+    controlType: 'depth' | 'time';
+    depth?: number;
+    timeMs?: number;
   };
 
   sprtBounds: {
@@ -220,8 +224,11 @@ export class ExperimentManager {
       params.candidate?.engineId ||
       params.candidate?.id ||
       'rothello-rust';
+    const controlType = params.controlType === 'time' ? 'time' : 'depth';
     const candidateDepth =
       params.candidateDepth ?? params.candidate?.depth ?? 6;
+    const candidateTimeMs =
+      params.candidateTimeMs ?? params.candidate?.timeMs ?? 100;
     const baselineEngineId =
       params.baselineEngineId ||
       params.baseline?.engineId ||
@@ -229,6 +236,8 @@ export class ExperimentManager {
       'builtin';
     const baselineDepth =
       params.baselineDepth ?? params.baseline?.depth ?? 6;
+    const baselineTimeMs =
+      params.baselineTimeMs ?? params.baseline?.timeMs ?? 100;
     const elo0 = params.elo0 ?? params.sprtBounds?.elo0 ?? 0.0;
     const elo1 = params.elo1 ?? params.sprtBounds?.elo1 ?? 5.0;
     const baselineAnchorElo = params.baselineAnchorElo ?? 1500;
@@ -262,12 +271,16 @@ export class ExperimentManager {
       candidate: {
         engineId: candidateEngineId,
         name: candBridge.getActiveConfig().name,
+        controlType,
         depth: candidateDepth,
+        timeMs: candidateTimeMs,
       },
       baseline: {
         engineId: baselineEngineId,
         name: baseBridge.getActiveConfig().name,
+        controlType,
         depth: baselineDepth,
+        timeMs: baselineTimeMs,
       },
       sprtBounds: {
         elo0,
@@ -454,16 +467,14 @@ export class ExperimentManager {
     pairId: number,
     openingName: string,
     openingMoves: string[],
-    cand: { engineId: string; depth: number },
-    base: { engineId: string; depth: number },
+    cand: { engineId: string; controlType: 'depth' | 'time'; depth?: number; timeMs?: number },
+    base: { engineId: string; controlType: 'depth' | 'time'; depth?: number; timeMs?: number },
     getEngine: (id: string) => NBoardEngineBridge
   ): Promise<GamePairResult> {
     // Game 1: Candidate is Black, Baseline is White
     const g1 = await this.playSingleGame(
-      cand.engineId,
-      cand.depth,
-      base.engineId,
-      base.depth,
+      cand,
+      base,
       openingMoves,
       getEngine,
       true
@@ -471,10 +482,8 @@ export class ExperimentManager {
 
     // Game 2: Baseline is Black, Candidate is White
     const g2 = await this.playSingleGame(
-      base.engineId,
-      base.depth,
-      cand.engineId,
-      cand.depth,
+      base,
+      cand,
       openingMoves,
       getEngine,
       false
@@ -500,10 +509,8 @@ export class ExperimentManager {
    * Plays one full game from opening moves to terminal position using exact board simulation.
    */
   private async playSingleGame(
-    blackId: string,
-    blackDepth: number,
-    whiteId: string,
-    whiteDepth: number,
+    black: { engineId: string; controlType: 'depth' | 'time'; depth?: number; timeMs?: number },
+    white: { engineId: string; controlType: 'depth' | 'time'; depth?: number; timeMs?: number },
     openingMoves: string[],
     getEngine: (id: string) => NBoardEngineBridge,
     isCandBlack: boolean
@@ -516,12 +523,6 @@ export class ExperimentManager {
     movesCount: number;
     ggf: string;
   }> {
-    const blackEng = getEngine(blackId);
-    const whiteEng = getEngine(whiteId);
-
-    blackEng.setDepth(blackDepth);
-    whiteEng.setDepth(whiteDepth);
-
     let state = createInitialGameState();
     for (const m of openingMoves) {
       const coord = algebraicToCoord(m);
@@ -538,18 +539,31 @@ export class ExperimentManager {
         continue;
       }
 
-      const activeEng = state.currentPlayer === 1 ? blackEng : whiteEng;
-      const activeDepth = state.currentPlayer === 1 ? blackDepth : whiteDepth;
+      const activeInfo = state.currentPlayer === 1 ? black : white;
+      const activeEng = getEngine(activeInfo.engineId);
 
       const ggf = toGGF(state);
       activeEng.setGame(ggf);
-      activeEng.setDepth(activeDepth);
+
+      const timeLimitSec =
+        activeInfo.controlType === 'time' && activeInfo.timeMs
+          ? activeInfo.timeMs / 1000
+          : undefined;
+
+      if (timeLimitSec) {
+        activeEng.setTimeLimit(timeLimitSec);
+      } else {
+        activeEng.setTimeLimit(0);
+        activeEng.setDepth(activeInfo.depth ?? 6);
+      }
+
+      const timeoutMs = timeLimitSec ? Math.max(timeLimitSec * 2500, 2000) : 3500;
 
       const moveStr = await new Promise<string>((resolve) => {
         const timeout = setTimeout(() => {
           const legals = Object.keys(state.legalMoves);
           resolve(legals[0] || 'pa');
-        }, 3000);
+        }, timeoutMs);
         const onMove = (data: any) => {
           clearTimeout(timeout);
           activeEng.off('move', onMove);
@@ -599,8 +613,8 @@ export class ExperimentManager {
     }
 
     return {
-      blackId,
-      whiteId,
+      blackId: black.engineId,
+      whiteId: white.engineId,
       winner,
       candDiscs: isCandBlack ? bScore : wScore,
       baseDiscs: isCandBlack ? wScore : bScore,

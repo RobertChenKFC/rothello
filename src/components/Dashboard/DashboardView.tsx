@@ -61,12 +61,16 @@ export interface Experiment {
   candidate: {
     engineId: string;
     name: string;
-    depth: number;
+    controlType?: 'depth' | 'time';
+    depth?: number;
+    timeMs?: number;
   };
   baseline: {
     engineId: string;
     name: string;
-    depth: number;
+    controlType?: 'depth' | 'time';
+    depth?: number;
+    timeMs?: number;
   };
   sprtBounds: {
     elo0: number;
@@ -517,7 +521,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   Candidate Engine
                 </span>
                 <span className="text-[10px] font-mono text-gray-400">
-                  d={displayExp.candidate.depth}
+                  {displayExp.candidate.controlType === 'time'
+                    ? `${displayExp.candidate.timeMs}ms/move`
+                    : `d=${displayExp.candidate.depth}`}
                 </span>
               </div>
               <div className="text-sm font-semibold text-white">
@@ -535,7 +541,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   Baseline Engine
                 </span>
                 <span className="text-[10px] font-mono text-gray-400">
-                  d={displayExp.baseline.depth}
+                  {displayExp.baseline.controlType === 'time'
+                    ? `${displayExp.baseline.timeMs}ms/move`
+                    : `d=${displayExp.baseline.depth}`}
                 </span>
               </div>
               <div className="text-sm font-semibold text-white">
@@ -675,10 +683,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {exp.git.commit}
                     </td>
                     <td className="py-2 px-3 text-gray-300">
-                      {exp.candidate.name} (d={exp.candidate.depth})
+                      {exp.candidate.name} (
+                      {exp.candidate.controlType === 'time'
+                        ? `${exp.candidate.timeMs}ms`
+                        : `d=${exp.candidate.depth}`}
+                      )
                     </td>
                     <td className="py-2 px-3 text-gray-400">
-                      {exp.baseline.name} (d={exp.baseline.depth})
+                      {exp.baseline.name} (
+                      {exp.baseline.controlType === 'time'
+                        ? `${exp.baseline.timeMs}ms`
+                        : `d=${exp.baseline.depth}`}
+                      )
                     </td>
                     <td className="py-2 px-3 text-center font-bold text-white">
                       {exp.stats.totalGames}

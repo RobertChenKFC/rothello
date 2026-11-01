@@ -15,10 +15,13 @@ interface NewExperimentModalProps {
   } | null;
   onStartExperiment: (params: {
     name: string;
+    controlType: 'depth' | 'time';
     candidateEngineId: string;
     candidateDepth: number;
+    candidateTimeMs: number;
     baselineEngineId: string;
     baselineDepth: number;
+    baselineTimeMs: number;
     baselineAnchorElo: number;
     elo0: number;
     elo1: number;
@@ -35,10 +38,13 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
   onStartExperiment,
 }) => {
   const [name, setName] = useState('');
+  const [controlType, setControlType] = useState<'depth' | 'time'>('depth');
   const [candidateEngineId, setCandidateEngineId] = useState('rothello-rust');
   const [candidateDepth, setCandidateDepth] = useState(6);
+  const [candidateTimeMs, setCandidateTimeMs] = useState(100);
   const [baselineEngineId, setBaselineEngineId] = useState('rothello-rust');
   const [baselineDepth, setBaselineDepth] = useState(4);
+  const [baselineTimeMs, setBaselineTimeMs] = useState(100);
   const [baselineAnchorElo, setBaselineAnchorElo] = useState(1500);
   const [testType, setTestType] = useState<'sprt' | 'fixed_games'>('sprt');
   const [elo0, setElo0] = useState(0.0);
@@ -49,14 +55,20 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const defaultName =
+      controlType === 'time'
+        ? `Time Control: Rust ${candidateTimeMs}ms vs ${baselineEngineId === 'rothello-rust' ? `Rust ${baselineTimeMs}ms` : baselineEngineId}`
+        : `Self-Play: Rust d=${candidateDepth} vs ${baselineEngineId === 'rothello-rust' ? `Rust d=${baselineDepth}` : baselineEngineId}`;
+
     onStartExperiment({
-      name:
-        name.trim() ||
-        `Self-Play: Rust d=${candidateDepth} vs ${baselineEngineId === 'rothello-rust' ? `Rust d=${baselineDepth}` : baselineEngineId}`,
+      name: name.trim() || defaultName,
+      controlType,
       candidateEngineId,
       candidateDepth,
+      candidateTimeMs,
       baselineEngineId,
       baselineDepth,
+      baselineTimeMs,
       baselineAnchorElo,
       elo0,
       elo1,
@@ -128,7 +140,57 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
             />
           </div>
 
-          {/* Engines and Depths Selection */}
+          {/* Resource Control Mode: Fixed Depth vs Fixed Time Control */}
+          <div className="bg-[#171614] border border-[#2d2a25] p-3 rounded-lg space-y-2">
+            <span className="font-semibold text-gray-300 block">Test Resource Control</span>
+            <div className="grid grid-cols-2 gap-3">
+              <label
+                className={`flex items-start space-x-2 p-2 rounded border cursor-pointer transition ${
+                  controlType === 'depth'
+                    ? 'bg-[#25221d] border-yellow-500/70 text-white'
+                    : 'bg-[#1b1916] border-[#312e29] text-gray-400'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="controlType"
+                  checked={controlType === 'depth'}
+                  onChange={() => setControlType('depth')}
+                  className="accent-yellow-500 mt-0.5"
+                />
+                <div>
+                  <div className="font-bold text-xs">Fixed Depth Mode</div>
+                  <div className="text-[10px] text-gray-500">
+                    Tests pruning & evaluation heuristics per ply
+                  </div>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start space-x-2 p-2 rounded border cursor-pointer transition ${
+                  controlType === 'time'
+                    ? 'bg-[#25221d] border-yellow-500/70 text-white'
+                    : 'bg-[#1b1916] border-[#312e29] text-gray-400'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="controlType"
+                  checked={controlType === 'time'}
+                  onChange={() => setControlType('time')}
+                  className="accent-yellow-500 mt-0.5"
+                />
+                <div>
+                  <div className="font-bold text-xs">Fixed Time Control (TC)</div>
+                  <div className="text-[10px] text-gray-500">
+                    Measures raw NPS speedups via iterative deepening
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Engines and Depths / Time Selection */}
           <div className="grid grid-cols-2 gap-3">
             {/* Candidate */}
             <div className="bg-[#171614] border border-[#2d2a25] p-3 rounded-lg space-y-2">
@@ -147,17 +209,32 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] text-gray-500 block mb-1">Search Depth</label>
-                <input
-                  type="number"
-                  min={2}
-                  max={20}
-                  value={candidateDepth}
-                  onChange={(e) => setCandidateDepth(parseInt(e.target.value, 10) || 6)}
-                  className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
-                />
-              </div>
+              {controlType === 'depth' ? (
+                <div>
+                  <label className="text-[10px] text-gray-500 block mb-1">Search Depth (Plies)</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={20}
+                    value={candidateDepth}
+                    onChange={(e) => setCandidateDepth(parseInt(e.target.value, 10) || 6)}
+                    className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[10px] text-gray-500 block mb-1">Time Limit (ms / move)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={5000}
+                    step={25}
+                    value={candidateTimeMs}
+                    onChange={(e) => setCandidateTimeMs(parseInt(e.target.value, 10) || 100)}
+                    className="w-full bg-[#24211d] text-yellow-400 font-mono rounded px-2 py-1 border border-[#38342e]"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Baseline */}
@@ -178,17 +255,32 @@ export const NewExperimentModal: React.FC<NewExperimentModalProps> = ({
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-gray-500 block mb-1">Depth</label>
-                  <input
-                    type="number"
-                    min={2}
-                    max={20}
-                    value={baselineDepth}
-                    onChange={(e) => setBaselineDepth(parseInt(e.target.value, 10) || 6)}
-                    className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
-                  />
-                </div>
+                {controlType === 'depth' ? (
+                  <div>
+                    <label className="text-[10px] text-gray-500 block mb-1">Depth</label>
+                    <input
+                      type="number"
+                      min={2}
+                      max={20}
+                      value={baselineDepth}
+                      onChange={(e) => setBaselineDepth(parseInt(e.target.value, 10) || 6)}
+                      className="w-full bg-[#24211d] text-white font-mono rounded px-2 py-1 border border-[#38342e]"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-[10px] text-gray-500 block mb-1">Time (ms)</label>
+                    <input
+                      type="number"
+                      min={10}
+                      max={5000}
+                      step={25}
+                      value={baselineTimeMs}
+                      onChange={(e) => setBaselineTimeMs(parseInt(e.target.value, 10) || 100)}
+                      className="w-full bg-[#24211d] text-yellow-400 font-mono rounded px-2 py-1 border border-[#38342e]"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="text-[10px] text-gray-500 block mb-1">Anchor Elo</label>
                   <input
