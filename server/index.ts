@@ -86,6 +86,7 @@ function getEngine(engineId?: string): NBoardEngineBridge {
 // Pre-initialize engines
 getEngine('builtin');
 getEngine('edax');
+getEngine('rothello-rust');
 
 wss.on('connection', (ws: WebSocket) => {
   const activeEngine = getEngine(primaryEngineId);
