@@ -90,7 +90,22 @@ impl NBoardLoop {
                     stdout.flush().unwrap();
 
                     let search_depth = if self.time_limit_sec.is_some() { 24 } else { self.depth };
-                    let res = self.searcher.search(&self.board, search_depth, self.time_limit_sec, None);
+
+                    let mut cb = |d: u8, score: i32, bm: u8, nodes: u64, elapsed: f64| {
+                        let alg = sq_to_alg(bm);
+                        let eval_score = (score as f64) / 100.0;
+                        let time_cs = (elapsed * 100.0) as u64;
+                        writeln!(stdout, "search {} {:.2} {} {}", alg, eval_score, time_cs, d).unwrap();
+                        writeln!(stdout, "nodestats {} {:.3}", nodes, elapsed).unwrap();
+                        stdout.flush().unwrap();
+                    };
+
+                    let res = self.searcher.search(
+                        &self.board,
+                        search_depth,
+                        self.time_limit_sec,
+                        Some(&mut cb),
+                    );
 
                     writeln!(stdout, "nodestats {} {:.3}", res.nodes, res.time_sec).unwrap();
                     let move_str = match res.best_move {

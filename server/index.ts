@@ -204,8 +204,8 @@ app.delete('/api/experiments', (req, res) => {
 app.post('/api/benchmark', async (req, res) => {
   try {
     const engineId = req.body.engineId || 'rothello-rust';
-    const depth = req.body.depth || 6;
-    const report = await experimentManager.runBenchmark(engineId, depth, getEngine);
+    const durationSec = req.body.durationSec || 10;
+    const report = await experimentManager.runBenchmark(engineId, durationSec, getEngine);
     res.json(report);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

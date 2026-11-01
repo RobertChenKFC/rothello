@@ -8,11 +8,12 @@ import {
   CircleDot,
   BarChart2,
   GitCommit,
+  Zap,
 } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'arena';
-  onTabChange: (tab: 'dashboard' | 'arena') => void;
+  activeTab: 'dashboard' | 'benchmarks' | 'arena';
+  onTabChange: (tab: 'dashboard' | 'benchmarks' | 'arena') => void;
   mode: GameMode;
   onModeChange: (mode: GameMode) => void;
   userColor: Player;
@@ -68,6 +69,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <BarChart2 size={14} />
             <span>Dashboard</span>
+          </button>
+          <button
+            onClick={() => onTabChange('benchmarks')}
+            className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-bold transition ${
+              activeTab === 'benchmarks'
+                ? 'bg-yellow-600 text-black shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Zap size={14} />
+            <span>Engine Benchmarks</span>
           </button>
           <button
             onClick={() => onTabChange('arena')}

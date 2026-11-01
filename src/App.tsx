@@ -17,10 +17,11 @@ import { EnginePanel } from './components/EnginePanel';
 import { Header } from './components/Header';
 import { BotMatchControls } from './components/BotMatchControls';
 import { DashboardView } from './components/Dashboard/DashboardView';
+import { BenchmarkView } from './components/BenchmarkView';
 
 export const App: React.FC = () => {
   // Default to Fishtest Dashboard as requested
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'arena'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'benchmarks' | 'arena'>('dashboard');
   const [experiments, setExperiments] = useState<any[]>([]);
   const [activeExperiment, setActiveExperiment] = useState<any | null>(null);
   const [gitInfo, setGitInfo] = useState<any | null>(null);
@@ -600,11 +601,11 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRunBenchmark = async (engineId: string, depth: number) => {
+  const handleRunBenchmark = async (engineId: string, durationSec: number = 10) => {
     const res = await fetch('/api/benchmark', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ engineId, depth }),
+      body: JSON.stringify({ engineId, durationSec }),
     });
     return await res.json();
   };
@@ -747,6 +748,11 @@ export const App: React.FC = () => {
             onStopExperiment={handleStopExperiment}
             onClearExperiments={handleClearExperiments}
             onReplayGame={handleReplayGame}
+            onRunBenchmark={handleRunBenchmark}
+          />
+        ) : activeTab === 'benchmarks' ? (
+          <BenchmarkView
+            availableEngines={availableEngines}
             onRunBenchmark={handleRunBenchmark}
           />
         ) : (

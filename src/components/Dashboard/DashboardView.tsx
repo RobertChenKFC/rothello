@@ -92,7 +92,7 @@ export interface DashboardViewProps {
   onStopExperiment: () => void;
   onClearExperiments?: () => void;
   onReplayGame?: (ggf: string) => void;
-  onRunBenchmark: (engineId: string, depth: number) => Promise<any>;
+  onRunBenchmark: (engineId: string, durationSec?: number) => Promise<any>;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -110,7 +110,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
-  const [benchmarkDepth, setBenchmarkDepth] = useState<number>(10);
   const [benchmarkReport, setBenchmarkReport] = useState<any | null>(null);
 
   // Selected experiment to display in the primary monitor card
@@ -131,10 +130,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return est > max ? est : max;
   }, 1500);
 
-  const handleRunDiagnostic = async (depth: number = benchmarkDepth) => {
+  const handleRunDiagnostic = async () => {
     setIsBenchmarkRunning(true);
     try {
-      const report = await onRunBenchmark('rothello-rust', depth);
+      const report = await onRunBenchmark('rothello-rust', 10);
       setBenchmarkReport(report);
     } catch (err) {
       console.error('Benchmark failed:', err);
@@ -268,38 +267,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           )}
 
-          {/* Benchmark Duration Preset & Trigger */}
-          <div className="flex items-center space-x-1.5 bg-[#25221d] border border-[#38342e] rounded-lg p-1 text-xs">
-            <button
-              onClick={() => handleRunDiagnostic(benchmarkDepth)}
-              disabled={isBenchmarkRunning}
-              className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-gray-200 hover:text-white transition disabled:opacity-50"
-              title="Run steady-state diagnostic benchmark"
-            >
-              <Zap
-                size={14}
-                className={
-                  isBenchmarkRunning
-                    ? 'text-yellow-400 animate-spin'
-                    : 'text-yellow-400'
-                }
-              />
-              <span>{isBenchmarkRunning ? 'Benchmarking...' : 'Benchmark'}</span>
-            </button>
-
-            <select
-              value={benchmarkDepth}
-              onChange={(e) => setBenchmarkDepth(parseInt(e.target.value, 10))}
-              disabled={isBenchmarkRunning}
-              className="bg-[#1b1916] text-yellow-400 font-mono text-[11px] rounded px-2 py-1 border border-[#312e29] focus:outline-none cursor-pointer"
-              title="Select search depth preset (longer search reaches steady state)"
-            >
-              <option value={8}>Depth 8 (~0.2s, 750k nodes)</option>
-              <option value={10}>Depth 10 (~2s, 8M nodes - Steady State)</option>
-              <option value={11}>Depth 11 (~8s, 35M nodes - Stress Test)</option>
-              <option value={12}>Depth 12 (~25s, 100M+ nodes - Sustained)</option>
-            </select>
-          </div>
+          <button
+            onClick={handleRunDiagnostic}
+            disabled={isBenchmarkRunning}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-[#25221d] hover:bg-[#332f28] border border-[#38342e] rounded-lg text-xs font-semibold text-gray-200 transition disabled:opacity-50"
+            title="Run 10-second steady-state diagnostic benchmark on Rothello (Rust)"
+          >
+            <Zap
+              size={14}
+              className={
+                isBenchmarkRunning
+                  ? 'text-yellow-400 animate-spin'
+                  : 'text-yellow-400'
+              }
+            />
+            <span>{isBenchmarkRunning ? 'Benchmarking 10s...' : 'Benchmark Rothello (10s)'}</span>
+          </button>
 
           <button
             onClick={() => setIsModalOpen(true)}
@@ -318,7 +301,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-2">
               <Zap size={16} className="text-yellow-400" />
               <span className="font-bold text-sm text-white">
-                Steady-State Benchmark Report ({benchmarkReport.engineName} - Depth {benchmarkReport.searchDepth})
+                Steady-State Benchmark (10s) — {benchmarkReport.engineName}
               </span>
             </div>
             <button
