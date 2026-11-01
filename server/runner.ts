@@ -148,6 +148,16 @@ export class ExperimentManager {
       this.ensureDirectory();
       const list = Array.from(this.experiments.values());
       fs.writeFileSync(this.ledgerPath, JSON.stringify(list, null, 2), 'utf-8');
+
+      // Also sync to public/data/ledger.json for GitHub Pages static viewer
+      try {
+        const publicPath = path.resolve(__dirname, '../public/data/ledger.json');
+        const publicDir = path.dirname(publicPath);
+        if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+        fs.writeFileSync(publicPath, JSON.stringify(list, null, 2), 'utf-8');
+      } catch (e) {
+        // Non-critical if public path doesn't exist
+      }
     } catch (err) {
       console.error('Failed to write experiment ledger:', err);
     }

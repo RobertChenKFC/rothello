@@ -24,6 +24,7 @@ export const App: React.FC = () => {
   const [experiments, setExperiments] = useState<any[]>([]);
   const [activeExperiment, setActiveExperiment] = useState<any | null>(null);
   const [gitInfo, setGitInfo] = useState<any | null>(null);
+  const [isStaticViewer, setIsStaticViewer] = useState(false);
 
   const [gameState, setGameState] = useState<GameState>(createInitialGameState());
   const [flipped, setFlipped] = useState(false);
@@ -87,22 +88,51 @@ export const App: React.FC = () => {
       .catch((err) => console.error('Failed to fetch engines:', err));
 
     fetch('/api/git-info')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('API unavailable');
+        return res.json();
+      })
       .then((data) => setGitInfo(data))
-      .catch((err) => console.error(err));
+      .catch(() => {
+        // Static GitHub Pages fallback
+        fetch('./data/git-info.json')
+          .then((res) => res.json())
+          .then((data) => setGitInfo(data))
+          .catch((err) => console.log('Static git-info fallback:', err));
+      });
 
     fetch('/api/experiments')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('API unavailable');
+        return res.json();
+      })
       .then((data) => {
         if (data.experiments) setExperiments(data.experiments);
         if (data.active) setActiveExperiment(data.active);
       })
-      .catch((err) => console.error(err));
+      .catch(() => {
+        // Static GitHub Pages fallback
+        setIsStaticViewer(true);
+        fetch('./data/ledger.json')
+          .then((res) => res.json())
+          .then((data) => {
+            if (Array.isArray(data)) {
+              setExperiments(data);
+              if (data.length > 0) setActiveExperiment(data[0]);
+            }
+          })
+          .catch((err) => console.log('Static ledger fallback:', err));
+      });
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     const socket = new WebSocket(wsUrl);
     wsRef.current = socket;
+
+    socket.onerror = () => {
+      // In static GitHub Pages deployment, WebSocket will fail gracefully
+      setIsStaticViewer(true);
+    };
 
     socket.onopen = () => {
       setRawLogs((prev) => [...prev, '[WS] Connected to NBoard bridge']);
@@ -708,6 +738,7 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col items-center gap-4">
         {activeTab === 'dashboard' ? (
           <DashboardView
+            isStaticViewer={isStaticViewer}
             availableEngines={availableEngines}
             experiments={experiments}
             activeExperiment={activeExperiment}

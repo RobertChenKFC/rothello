@@ -83,6 +83,7 @@ export interface Experiment {
 }
 
 export interface DashboardViewProps {
+  isStaticViewer?: boolean;
   availableEngines: { id: string; name: string; available: boolean; type: string }[];
   experiments: Experiment[];
   activeExperiment: Experiment | null;
@@ -95,6 +96,7 @@ export interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
+  isStaticViewer = false,
   availableEngines,
   experiments,
   activeExperiment,
@@ -174,6 +176,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6">
+      {/* Static Public Viewer Mode Banner */}
+      {isStaticViewer && (
+        <div className="bg-[#1b1916] border border-blue-900/60 rounded-xl p-3 px-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-200">
+          <div className="flex items-center space-x-2.5">
+            <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0 animate-pulse" />
+            <span>
+              <strong>Rothello Public Testing Archive</strong> — Viewing committed test results and Elo progression. Game replays are interactive! To run live self-play tests with the native Rust engine on your machine, clone the repository and run <code className="bg-[#141311] px-1.5 py-0.5 rounded text-yellow-300 font-mono">npm run dev</code>.
+            </span>
+          </div>
+          <a
+            href="https://github.com/RobertChenKFC/rothello"
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 px-2.5 py-1 bg-blue-950 hover:bg-blue-900 border border-blue-700/60 rounded font-semibold text-blue-200 transition text-center"
+          >
+            GitHub Repo ↗
+          </a>
+        </div>
+      )}
+
       {/* Top Banner: Global Stats & Action Bar */}
       <div className="bg-[#1b1916] border border-[#312e29] rounded-xl p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Metric Summary Cards */}

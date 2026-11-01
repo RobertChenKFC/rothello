@@ -1,0 +1,65 @@
+[
+  {
+    "id": "exp-baseline-0",
+    "name": "Baseline Reference: Rothello Rust Core (Master)",
+    "createdAt": "2026-11-01T22:30:00.000Z",
+    "status": "passed",
+    "type": "sprt",
+    "git": {
+      "commit": "a47a09a",
+      "message": "docs: comprehensive README covering local setup, testing dashboard, and PR contribution workflow",
+      "branch": "master",
+      "author": "Robert Chen",
+      "isDirty": false,
+      "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/a47a09a"
+    },
+    "candidate": {
+      "engineId": "rothello-rust",
+      "name": "Rothello Engine (Rust)",
+      "controlType": "time",
+      "depth": 6,
+      "timeMs": 100
+    },
+    "baseline": {
+      "engineId": "rothello-rust",
+      "name": "Rothello Baseline",
+      "controlType": "time",
+      "depth": 6,
+      "timeMs": 100
+    },
+    "sprtBounds": {
+      "elo0": 0,
+      "elo1": 5,
+      "lowerBound": -2.944,
+      "upperBound": 2.944
+    },
+    "baselineAnchorElo": 1500,
+    "stats": {
+      "totalGames": 0,
+      "wins": 0,
+      "draws": 0,
+      "losses": 0,
+      "winRate": 0.5,
+      "elo": 0,
+      "estimatedElo": 1500,
+      "eloError": 0,
+      "llr": 0,
+      "significance": "inconclusive",
+      "pentanomial": {
+        "ww": 0,
+        "wd": 0,
+        "wlOrDd": 0,
+        "ld": 0,
+        "ll": 0
+      },
+      "candidateAvgNodes": 215000,
+      "candidateAvgNps": 1950000,
+      "candidateEbf": 5.48,
+      "baselineAvgNodes": 215000,
+      "baselineAvgNps": 1950000,
+      "baselineEbf": 5.48,
+      "avgDiscMargin": 0
+    },
+    "recentGames": []
+  }
+]

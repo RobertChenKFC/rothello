@@ -2,6 +2,19 @@
 
 **Rothello** is a modern, high-performance Othello (Reversi) engine and tournament-grade research platform built with a native Rust core, NBoard protocol support, a Lichess-inspired web interface, and a Stockfish/Fishtest-style self-play testing dashboard.
 
+🌐 **Public Testing Archive (Live Web View)**: [https://robertchenkfc.github.io/rothello/](https://robertchenkfc.github.io/rothello/)
+
+---
+
+## 🏛️ Two Environments: Static Public Page vs. Local Test Lab
+
+Rothello is architected around two complementary workflows:
+
+| Environment | Where It Runs | Purpose |
+| :--- | :--- | :--- |
+| **Static Public Page** | **[GitHub Pages](https://robertchenkfc.github.io/rothello/)** | **Public showroom & historical archive.** Displays official Elo progression across merged commits, past SPRT runs, and known regressions. **100% serverless**; game replays run client-side in React so any visitor can review matches move-by-move. |
+| **Local Dashboard & Runner** | **`localhost:5173`** | **The developer compute lab.** Harnesses your local CPU power to run the native Rust engine at full speed (~2M NPS), live SPRT self-play matches, and time control tests. Automatically synchronizes results to `public/data/ledger.json`. |
+
 ---
 
 ## 🌟 Key Features
@@ -167,9 +180,13 @@ We use a Fishtest-inspired development cycle linking every test directly to Git 
    - **SPRT LLR**: +2.97 (Bounds: [-2.94, +2.94])
    ```
 
-### In Case of a Regression (`✗ Significant Loss` or `Inconclusive`)
-- **Negative knowledge is valuable**: Knowing that an idea didn't work prevents future wasted effort.
-- You can push the branch and open a closed PR or record the run in your commit history with the regression stats so the research history is preserved.
+### Publishing Results to the Static Public Archive
+1. Whenever an experiment is completed locally, it is recorded in `public/data/ledger.json`.
+2. Commit `public/data/ledger.json` along with your code changes.
+3. When the PR is merged into `master`, the automated GitHub Actions workflow (`.github/workflows/deploy.yml`) rebuilds the static app and deploys the updated results and game replays to [https://robertchenkfc.github.io/rothello/](https://robertchenkfc.github.io/rothello/).
+4. **First-time GitHub Pages Setup**:
+   - Go to your repository settings on GitHub: **Settings -> Pages**.
+   - Under **Build and deployment -> Source**, select **"GitHub Actions"**.
 
 ---
 
