@@ -3,6 +3,8 @@ import { GameState, Player, EngineStatus } from './lib/types';
 import {
   createInitialGameState,
   makeMove,
+  makePass,
+  getLegalMoves,
   replayToMove,
   toGGF,
   algebraicToCoord,
@@ -147,13 +149,18 @@ export const App: React.FC = () => {
           case 'engine_move': {
             isEngineMovingRef.current = false;
             setEngineStatus((prev) => ({ ...prev, state: 'waiting' }));
-            if (msg.move && msg.move !== 'pass' && msg.move !== '--') {
-              const coord = algebraicToCoord(msg.move);
-              if (coord) {
-                setGameState((current) => {
-                  const nextState = makeMove(current, coord.row, coord.col);
-                  return nextState || current;
-                });
+            if (msg.move) {
+              const lower = msg.move.toLowerCase();
+              if (lower === 'pass' || lower === 'pa' || lower === '--') {
+                setGameState((current) => makePass(current));
+              } else {
+                const coord = algebraicToCoord(msg.move);
+                if (coord) {
+                  setGameState((current) => {
+                    const nextState = makeMove(current, coord.row, coord.col);
+                    return nextState || current;
+                  });
+                }
               }
             }
             break;
@@ -275,6 +282,20 @@ export const App: React.FC = () => {
     botMoveDelay,
     currentEngineId,
   ]);
+
+  // Automatically pass turn when current player has no moves but opponent does
+  useEffect(() => {
+    if (!gameState.isGameOver && Object.keys(gameState.legalMoves).length === 0) {
+      const opp = -gameState.currentPlayer as Player;
+      const oppMoves = getLegalMoves(gameState.board, opp);
+      if (Object.keys(oppMoves).length > 0) {
+        const timer = setTimeout(() => {
+          setGameState((prev) => makePass(prev));
+        }, 400);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameState.legalMoves, gameState.isGameOver, gameState.currentPlayer, gameState.board]);
 
   const handleSquareClick = (row: number, col: number) => {
     if (gameState.isGameOver) return;
@@ -406,6 +427,13 @@ export const App: React.FC = () => {
     return false;
   };
 
+  const isBotMatch = gameState.mode === 'engine_vs_engine';
+  const activeBotDepth = gameState.currentPlayer === 1 ? blackBotDepth : whiteBotDepth;
+  const activeDisplayDepth = isBotMatch ? activeBotDepth : (engineStatus.depth ?? gameState.engineDepth);
+  const activeBotName = isBotMatch
+    ? `${getEngineNameById(gameState.currentPlayer === 1 ? blackBotId : whiteBotId)} (${gameState.currentPlayer === 1 ? 'Black' : 'White'})`
+    : undefined;
+
   return (
     <div className="flex flex-col min-h-screen bg-[#161512] text-[#d0d0d0]">
       {/* Lichess Style Header */}
@@ -430,7 +458,7 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col items-center gap-4">
         {/* Dual Bot Match Control Bar (shown only in Bot Match mode) */}
         {gameState.mode === 'engine_vs_engine' && (
-          <div className="w-full max-w-4xl">
+          <div className="w-full max-w-5xl">
             <BotMatchControls
               availableEngines={availableEngines}
               blackEngineId={blackBotId}
@@ -509,9 +537,10 @@ export const App: React.FC = () => {
                 onRequestHint={handleRequestHint}
                 onRequestEngineMove={handleRequestEngineMove}
                 onSetDepth={handleSetDepth}
-                currentDepth={gameState.engineDepth}
+                currentDepth={activeDisplayDepth}
                 rawLogs={rawLogs}
-                isBotMatch={gameState.mode === 'engine_vs_engine'}
+                isBotMatch={isBotMatch}
+                activeBotName={activeBotName}
               />
             </div>
           </div>

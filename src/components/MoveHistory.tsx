@@ -112,10 +112,12 @@ export const MoveHistory: React.FC<MoveHistoryProps> = ({
                         className={`w-full text-left px-2 py-0.5 rounded transition ${
                           gameState.currentMoveIndex === t.bIdx
                             ? 'bg-[#3b3834] text-yellow-400 font-bold'
+                            : t.black === 'pass'
+                            ? 'text-gray-500 italic hover:bg-[#312e29]'
                             : 'text-gray-200 hover:bg-[#312e29]'
                         }`}
                       >
-                        {t.black}
+                        {t.black === 'pass' ? 'pass' : t.black}
                       </button>
                     )}
                   </td>
@@ -126,10 +128,12 @@ export const MoveHistory: React.FC<MoveHistoryProps> = ({
                         className={`w-full text-left px-2 py-0.5 rounded transition ${
                           gameState.currentMoveIndex === t.wIdx
                             ? 'bg-[#3b3834] text-yellow-400 font-bold'
+                            : t.white === 'pass'
+                            ? 'text-gray-500 italic hover:bg-[#312e29]'
                             : 'text-gray-200 hover:bg-[#312e29]'
                         }`}
                       >
-                        {t.white}
+                        {t.white === 'pass' ? 'pass' : t.white}
                       </button>
                     )}
                   </td>

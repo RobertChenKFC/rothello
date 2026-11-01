@@ -44,17 +44,17 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
   onMoveDelayChange,
 }) => {
   return (
-    <div className="w-full bg-[#1e1c18] border border-[#312e29] rounded-lg p-3 shadow-md flex flex-col md:flex-row items-center justify-between gap-3 text-xs select-none">
-      {/* Bot Selectors */}
-      <div className="flex items-center space-x-4">
+    <div className="w-full bg-[#1e1c18] border border-[#312e29] rounded-lg p-2.5 shadow-md flex flex-wrap items-center justify-between gap-3 text-xs select-none">
+      {/* Bot Selectors Group */}
+      <div className="flex items-center flex-wrap gap-2">
         {/* Black Bot */}
-        <div className="flex items-center space-x-2 bg-[#161512] px-3 py-1.5 rounded border border-[#2d2a25]">
-          <div className="w-3.5 h-3.5 rounded-full bg-black border border-gray-600 shadow-sm" />
+        <div className="flex items-center space-x-2 bg-[#161512] px-2.5 py-1.5 rounded border border-[#2d2a25]">
+          <div className="w-3.5 h-3.5 rounded-full bg-black border border-gray-600 shadow-sm shrink-0" />
           <span className="font-bold text-gray-300">Black:</span>
           <select
             value={blackEngineId}
             onChange={(e) => onSelectBlackEngine(e.target.value)}
-            className="bg-[#24211d] text-yellow-400 font-semibold rounded px-2 py-1 border border-[#3c3934] focus:outline-none"
+            className="max-w-[155px] truncate bg-[#24211d] text-yellow-400 font-semibold rounded px-2 py-1 border border-[#3c3934] focus:outline-none cursor-pointer"
           >
             {availableEngines.map((e) => (
               <option key={e.id} value={e.id} disabled={!e.available}>
@@ -75,16 +75,16 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
           </div>
         </div>
 
-        <span className="text-gray-500 font-bold uppercase text-[11px]">vs</span>
+        <span className="text-gray-500 font-bold uppercase text-[11px] px-1">vs</span>
 
         {/* White Bot */}
-        <div className="flex items-center space-x-2 bg-[#161512] px-3 py-1.5 rounded border border-[#2d2a25]">
-          <div className="w-3.5 h-3.5 rounded-full bg-white border border-gray-300 shadow-sm" />
+        <div className="flex items-center space-x-2 bg-[#161512] px-2.5 py-1.5 rounded border border-[#2d2a25]">
+          <div className="w-3.5 h-3.5 rounded-full bg-white border border-gray-300 shadow-sm shrink-0" />
           <span className="font-bold text-gray-300">White:</span>
           <select
             value={whiteEngineId}
             onChange={(e) => onSelectWhiteEngine(e.target.value)}
-            className="bg-[#24211d] text-yellow-400 font-semibold rounded px-2 py-1 border border-[#3c3934] focus:outline-none"
+            className="max-w-[155px] truncate bg-[#24211d] text-yellow-400 font-semibold rounded px-2 py-1 border border-[#3c3934] focus:outline-none cursor-pointer"
           >
             {availableEngines.map((e) => (
               <option key={e.id} value={e.id} disabled={!e.available}>
@@ -106,10 +106,10 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
         </div>
       </div>
 
-      {/* Speed & Controls */}
-      <div className="flex items-center space-x-3">
+      {/* Speed & Controls Group */}
+      <div className="flex items-center flex-wrap space-x-2.5 shrink-0 bg-[#161512] px-2.5 py-1.5 rounded border border-[#2d2a25]">
         {/* Delay Slider */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 pr-1">
           <span className="text-gray-400 text-[11px]">Delay:</span>
           <input
             type="range"
@@ -118,9 +118,9 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
             step={50}
             value={moveDelay}
             onChange={(e) => onMoveDelayChange(parseInt(e.target.value, 10))}
-            className="w-20 accent-yellow-500 cursor-pointer"
+            className="w-16 accent-yellow-500 cursor-pointer"
           />
-          <span className="font-mono text-gray-300 text-[10px] w-12 text-right">
+          <span className="font-mono text-gray-300 text-[10px] w-10 text-right">
             {moveDelay}ms
           </span>
         </div>
@@ -128,13 +128,13 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
         {/* Play / Pause */}
         <button
           onClick={onToggleRunning}
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded font-bold transition shadow ${
+          className={`flex items-center space-x-1 px-2.5 py-1 rounded font-bold transition shadow ${
             isRunning
               ? 'bg-yellow-600 hover:bg-yellow-500 text-black'
               : 'bg-green-700 hover:bg-green-600 text-white'
           }`}
         >
-          {isRunning ? <Pause size={13} /> : <Play size={13} />}
+          {isRunning ? <Pause size={12} /> : <Play size={12} />}
           <span>{isRunning ? 'Pause' : 'Start'}</span>
         </button>
 
@@ -143,18 +143,18 @@ export const BotMatchControls: React.FC<BotMatchControlsProps> = ({
           onClick={onStepMove}
           disabled={isRunning}
           title="Make 1 move"
-          className="p-1.5 bg-[#2b2824] hover:bg-[#3c3934] disabled:opacity-40 rounded text-gray-300 transition"
+          className="p-1 bg-[#2b2824] hover:bg-[#3c3934] disabled:opacity-40 rounded text-gray-300 transition"
         >
-          <StepForward size={14} />
+          <StepForward size={13} />
         </button>
 
         {/* Reset */}
         <button
           onClick={onResetMatch}
           title="Restart match"
-          className="p-1.5 bg-[#2b2824] hover:bg-[#3c3934] rounded text-gray-300 transition"
+          className="p-1 bg-[#2b2824] hover:bg-[#3c3934] rounded text-gray-300 transition"
         >
-          <RotateCcw size={14} />
+          <RotateCcw size={13} />
         </button>
       </div>
     </div>

@@ -176,7 +176,15 @@ export function makeMove(
       // Both players have no moves -> game over
       isGameOver = true;
     } else {
-      // Opponent passes, current player moves again
+      // Opponent must pass: record opponent's pass and current player moves again
+      const passMove: Move = {
+        row: -1,
+        col: -1,
+        algebraic: 'pass',
+        player: nextPlayer,
+        flips: [],
+      };
+      newHistory.push(passMove);
       activePlayer = state.currentPlayer;
       nextLegalMoves = originalPlayerMoves;
     }
@@ -210,6 +218,51 @@ export function makeMove(
 }
 
 /**
+ * Manually or automatically passes turn when current player has no moves.
+ */
+export function makePass(state: GameState): GameState {
+  if (state.isGameOver) return state;
+
+  const nextPlayer = -state.currentPlayer as Player;
+  const nextMoves = getLegalMoves(state.board, nextPlayer);
+  const currentMoves = getLegalMoves(state.board, state.currentPlayer);
+
+  // If neither has moves -> game over
+  if (Object.keys(nextMoves).length === 0 && Object.keys(currentMoves).length === 0) {
+    const counts = countDiscs(state.board);
+    let winner: Player | 0 | null = 0;
+    if (counts.black > counts.white) winner = 1;
+    else if (counts.white > counts.black) winner = -1;
+    return {
+      ...state,
+      isGameOver: true,
+      winner,
+      legalMoves: {},
+    };
+  }
+
+  const passMove: Move = {
+    row: -1,
+    col: -1,
+    algebraic: 'pass',
+    player: state.currentPlayer,
+    flips: [],
+  };
+
+  const newHistory = state.moveHistory.slice(0, state.currentMoveIndex);
+  newHistory.push(passMove);
+
+  return {
+    ...state,
+    currentPlayer: nextPlayer,
+    moveHistory: newHistory,
+    currentMoveIndex: newHistory.length,
+    legalMoves: nextMoves,
+    lastMove: passMove,
+  };
+}
+
+/**
  * Replays history up to targetIndex to support scrubbing / reviewing past positions.
  */
 export function replayToMove(initialState: GameState, targetIndex: number): GameState {
@@ -223,6 +276,11 @@ export function replayToMove(initialState: GameState, targetIndex: number): Game
 
   for (let i = 0; i < targetIndex; i++) {
     const m = initialState.moveHistory[i];
+    if (m.row === -1 || m.algebraic === 'pass') {
+      currentPlayer = -m.player as Player;
+      lastMove = m;
+      continue;
+    }
     const targetIdx = coordToIndex(m.row, m.col);
     const flips = getFlipsForMove(board, m.row, m.col, m.player);
 

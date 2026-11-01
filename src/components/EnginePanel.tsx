@@ -13,6 +13,7 @@ interface EnginePanelProps {
   currentDepth: number;
   rawLogs: string[];
   isBotMatch?: boolean;
+  activeBotName?: string;
 }
 
 export const EnginePanel: React.FC<EnginePanelProps> = ({
@@ -26,6 +27,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
   currentDepth,
   rawLogs,
   isBotMatch = false,
+  activeBotName,
 }) => {
   const [showConsole, setShowConsole] = useState(false);
   const [showEngineDropdown, setShowEngineDropdown] = useState(false);
@@ -50,38 +52,44 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
       <div className="px-3 py-2 bg-[#2b2824] border-b border-[#312e29] flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Cpu size={16} className="text-yellow-500" />
-          {/* Engine Selector Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowEngineDropdown(!showEngineDropdown)}
-              className="flex items-center space-x-1 font-semibold text-xs text-gray-200 hover:text-white transition"
-            >
-              <span>{engineStatus.name || 'Select Engine'}</span>
-              <ChevronDown size={12} />
-            </button>
-            {showEngineDropdown && (
-              <div className="absolute top-full left-0 mt-1 w-56 bg-[#2b2824] border border-[#3c3934] rounded shadow-xl z-50 py-1">
-                {availableEngines.map((e) => (
-                  <button
-                    key={e.id}
-                    onClick={() => {
-                      onSwitchEngine(e.id);
-                      setShowEngineDropdown(false);
-                    }}
-                    disabled={!e.available && e.type !== 'builtin'}
-                    className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-[#3c3934] transition ${
-                      currentEngineId === e.id ? 'text-yellow-400 font-bold' : 'text-gray-300'
-                    } ${!e.available && e.type !== 'builtin' ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <span>{e.name}</span>
-                    <span className="text-[10px] text-gray-400 uppercase font-mono">
-                      {e.type}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {isBotMatch ? (
+            <div className="flex items-center space-x-1 font-semibold text-xs text-yellow-400">
+              <span>{activeBotName || engineStatus.name}</span>
+            </div>
+          ) : (
+            /* Engine Selector Dropdown */
+            <div className="relative">
+              <button
+                onClick={() => setShowEngineDropdown(!showEngineDropdown)}
+                className="flex items-center space-x-1 font-semibold text-xs text-gray-200 hover:text-white transition"
+              >
+                <span>{engineStatus.name || 'Select Engine'}</span>
+                <ChevronDown size={12} />
+              </button>
+              {showEngineDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-56 bg-[#2b2824] border border-[#3c3934] rounded shadow-xl z-50 py-1">
+                  {availableEngines.map((e) => (
+                    <button
+                      key={e.id}
+                      onClick={() => {
+                        onSwitchEngine(e.id);
+                        setShowEngineDropdown(false);
+                      }}
+                      disabled={!e.available && e.type !== 'builtin'}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-[#3c3934] transition ${
+                        currentEngineId === e.id ? 'text-yellow-400 font-bold' : 'text-gray-300'
+                      } ${!e.available && e.type !== 'builtin' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <span>{e.name}</span>
+                      <span className="text-[10px] text-gray-400 uppercase font-mono">
+                        {e.type}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-2">
           {getStatusBadge()}
@@ -104,7 +112,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
           <div>
             <div className="text-[10px] text-gray-500 uppercase">Depth</div>
             <div className="font-mono text-xs font-bold text-gray-200">
-              {engineStatus.depth ?? currentDepth}
+              {currentDepth}
             </div>
           </div>
           <div>
