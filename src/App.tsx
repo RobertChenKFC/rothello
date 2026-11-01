@@ -29,17 +29,34 @@ export const App: React.FC = () => {
   // Bot Match dual engine states
   const [blackBotId, setBlackBotId] = useState('edax');
   const [whiteBotId, setWhiteBotId] = useState('builtin');
-  const [blackBotDepth, setBlackBotDepth] = useState(14);
-  const [whiteBotDepth, setWhiteBotDepth] = useState(8);
+  const [blackBotDepth, setBlackBotDepth] = useState(10);
+  const [whiteBotDepth, setWhiteBotDepth] = useState(6);
   const [isBotMatchRunning, setIsBotMatchRunning] = useState(false);
   const [botMoveDelay, setBotMoveDelay] = useState(350);
 
-  const [engineStatus, setEngineStatus] = useState<EngineStatus>({
-    name: 'Edax 4.4 (Native)',
-    connected: false,
-    state: 'idle',
-    statusText: 'Connecting to protocol server...',
-    hints: [],
+  const [engineTelemetry, setEngineTelemetry] = useState<Record<string, EngineStatus>>({
+    edax: {
+      name: 'Edax 4.4 (Native)',
+      connected: false,
+      state: 'waiting',
+      statusText: 'Engine ready',
+      depth: 10,
+      nodes: 0,
+      nps: 0,
+      timeSec: 0,
+      hints: [],
+    },
+    builtin: {
+      name: 'Rothello Reference (JS)',
+      connected: true,
+      state: 'waiting',
+      statusText: 'Engine ready',
+      depth: 6,
+      nodes: 0,
+      nps: 0,
+      timeSec: 0,
+      hints: [],
+    },
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -68,13 +85,10 @@ export const App: React.FC = () => {
     wsRef.current = socket;
 
     socket.onopen = () => {
-      setEngineStatus((prev) => ({
-        ...prev,
-        connected: true,
-        state: 'waiting',
-        statusText: 'Connected to NBoard bridge',
-      }));
       setRawLogs((prev) => [...prev, '[WS] Connected to NBoard bridge']);
+      // Immediately initialize depths for both engines
+      socket.send(JSON.stringify({ type: 'set_depth', engineId: blackBotId, depth: blackBotDepth }));
+      socket.send(JSON.stringify({ type: 'set_depth', engineId: whiteBotId, depth: whiteBotDepth }));
       // Send initial game state to all engines
       socket.send(JSON.stringify({ type: 'set_game', ggf: toGGF(gameState) }));
     };
@@ -82,49 +96,68 @@ export const App: React.FC = () => {
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        setRawLogs((prev) => [...prev, `<< [${msg.engineId || 'srv'}] ${msg.type} ${msg.move || msg.nodes || ''}`]);
+        const engId = msg.engineId || currentEngineId;
+        setRawLogs((prev) => [
+          ...prev,
+          `<< [${engId}] ${msg.type} ${msg.move || msg.nodes !== undefined ? msg.nodes : ''}`,
+        ]);
 
         switch (msg.type) {
           case 'engine_connected':
-            setEngineStatus((prev) => ({
+            setEngineTelemetry((prev) => ({
               ...prev,
-              connected: true,
-              name: msg.name,
-              state: 'waiting',
-              statusText: 'Engine ready',
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                connected: true,
+                name: msg.name || prev[engId]?.name || engId,
+                state: 'waiting',
+                statusText: 'Engine ready',
+                depth: msg.config?.depth ?? prev[engId]?.depth,
+              },
             }));
             break;
 
           case 'engine_name':
-            if (!msg.engineId || msg.engineId === currentEngineId) {
-              setEngineStatus((prev) => ({ ...prev, name: msg.engineName || prev.name }));
-            }
+            setEngineTelemetry((prev) => ({
+              ...prev,
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                name: msg.engineName || prev[engId]?.name || engId,
+              },
+            }));
             break;
 
           case 'engine_status':
-            setEngineStatus((prev) => ({
+            setEngineTelemetry((prev) => ({
               ...prev,
-              statusText: msg.statusText,
-              state: msg.statusText.includes('thinking')
-                ? 'thinking'
-                : msg.statusText.includes('learning')
-                ? 'learning'
-                : 'waiting',
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                statusText: msg.statusText,
+                state: msg.statusText.includes('thinking')
+                  ? 'thinking'
+                  : msg.statusText.includes('learning')
+                  ? 'learning'
+                  : 'waiting',
+              },
             }));
             break;
 
           case 'engine_nodestats':
-            setEngineStatus((prev) => ({
+            setEngineTelemetry((prev) => ({
               ...prev,
-              nodes: msg.nodes,
-              timeSec: msg.time,
-              nps: msg.nps,
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                nodes: msg.nodes,
+                timeSec: msg.time,
+                nps: msg.nps,
+              },
             }));
             break;
 
           case 'engine_hint':
-            setEngineStatus((prev) => {
-              const existing = prev.hints.filter((h) => h.move !== msg.move);
+            setEngineTelemetry((prev) => {
+              const currentEng = prev[engId] || { hints: [] };
+              const existing = (currentEng.hints || []).filter((h) => h.move !== msg.move);
               const updatedHints = [
                 ...existing,
                 {
@@ -139,16 +172,28 @@ export const App: React.FC = () => {
               updatedHints.sort((a, b) => b.score - a.score);
               return {
                 ...prev,
-                hints: updatedHints,
-                bestMove: updatedHints[0]?.move,
-                bestScore: updatedHints[0]?.score,
+                [engId]: {
+                  ...currentEng,
+                  hints: updatedHints,
+                  bestMove: updatedHints[0]?.move,
+                  bestScore: updatedHints[0]?.score,
+                },
               };
             });
             break;
 
           case 'engine_move': {
             isEngineMovingRef.current = false;
-            setEngineStatus((prev) => ({ ...prev, state: 'waiting' }));
+            setEngineTelemetry((prev) => ({
+              ...prev,
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                state: 'waiting',
+                lastMove: msg.move,
+                lastScore: msg.score,
+                timeSec: msg.time !== undefined ? msg.time : prev[engId]?.timeSec,
+              },
+            }));
             if (msg.move) {
               const lower = msg.move.toLowerCase();
               if (lower === 'pass' || lower === 'pa' || lower === '--') {
@@ -168,10 +213,13 @@ export const App: React.FC = () => {
 
           case 'engine_error':
             isEngineMovingRef.current = false;
-            setEngineStatus((prev) => ({
+            setEngineTelemetry((prev) => ({
               ...prev,
-              state: 'error',
-              statusText: `Error: ${msg.error}`,
+              [engId]: {
+                ...(prev[engId] || { hints: [] }),
+                state: 'error',
+                statusText: `Error: ${msg.error}`,
+              },
             }));
             break;
         }
@@ -181,12 +229,13 @@ export const App: React.FC = () => {
     };
 
     socket.onclose = () => {
-      setEngineStatus((prev) => ({
-        ...prev,
-        connected: false,
-        state: 'error',
-        statusText: 'Disconnected',
-      }));
+      setEngineTelemetry((prev) => {
+        const next: Record<string, EngineStatus> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          next[k] = { ...v, connected: false, state: 'error', statusText: 'Disconnected' };
+        }
+        return next;
+      });
     };
 
     return () => {
@@ -203,7 +252,10 @@ export const App: React.FC = () => {
         setRawLogs((prev) => [...prev, `>> set game ${ggf}`]);
 
         // Clear previous hints for new position
-        setEngineStatus((prev) => ({ ...prev, hints: [] }));
+        setEngineTelemetry((prev) => ({
+          ...prev,
+          [currentEngineId]: { ...(prev[currentEngineId] || { hints: [] }), hints: [] },
+        }));
 
         // If in analysis mode, request hints from active engine
         if (state.mode === 'analysis') {
@@ -255,6 +307,16 @@ export const App: React.FC = () => {
         isEngineMovingRef.current = true;
         const activeBotId = gameState.currentPlayer === 1 ? blackBotId : whiteBotId;
         const activeDepth = gameState.currentPlayer === 1 ? blackBotDepth : whiteBotDepth;
+
+        // Show live "thinking" state immediately on active bot card
+        setEngineTelemetry((prev) => ({
+          ...prev,
+          [activeBotId]: {
+            ...(prev[activeBotId] || { hints: [] }),
+            state: 'thinking',
+            statusText: 'Thinking...',
+          },
+        }));
 
         let hasFired = false;
         const timer = setTimeout(() => {
@@ -352,7 +414,10 @@ export const App: React.FC = () => {
     fresh.userColor = gameState.userColor;
     fresh.engineDepth = gameState.engineDepth;
     setGameState(fresh);
-    setEngineStatus((prev) => ({ ...prev, hints: [] }));
+    setEngineTelemetry((prev) => ({
+      ...prev,
+      [currentEngineId]: { ...(prev[currentEngineId] || { hints: [] }), hints: [] },
+    }));
     isEngineMovingRef.current = false;
   };
 
@@ -363,6 +428,46 @@ export const App: React.FC = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'switch_engine', config: selected }));
       setRawLogs((prev) => [...prev, `>> switch engine to ${selected.name}`]);
+    }
+  };
+
+  const handleSelectBlackDepth = (depth: number) => {
+    setBlackBotDepth(depth);
+    setEngineTelemetry((prev) => ({
+      ...prev,
+      [blackBotId]: { ...(prev[blackBotId] || { hints: [] }), depth },
+    }));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: blackBotId, depth }));
+      setRawLogs((prev) => [...prev, `>> [${blackBotId}] depth ${depth}`]);
+    }
+  };
+
+  const handleSelectWhiteDepth = (depth: number) => {
+    setWhiteBotDepth(depth);
+    setEngineTelemetry((prev) => ({
+      ...prev,
+      [whiteBotId]: { ...(prev[whiteBotId] || { hints: [] }), depth },
+    }));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: whiteBotId, depth }));
+      setRawLogs((prev) => [...prev, `>> [${whiteBotId}] depth ${depth}`]);
+    }
+  };
+
+  const handleSelectBlackEngine = (id: string) => {
+    setBlackBotId(id);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: id, depth: blackBotDepth }));
+      setRawLogs((prev) => [...prev, `>> [${id}] depth ${blackBotDepth}`]);
+    }
+  };
+
+  const handleSelectWhiteEngine = (id: string) => {
+    setWhiteBotId(id);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: id, depth: whiteBotDepth }));
+      setRawLogs((prev) => [...prev, `>> [${id}] depth ${whiteBotDepth}`]);
     }
   };
 
@@ -391,6 +496,10 @@ export const App: React.FC = () => {
 
   const handleSetDepth = (depth: number) => {
     setGameState((prev) => ({ ...prev, engineDepth: depth }));
+    setEngineTelemetry((prev) => ({
+      ...prev,
+      [currentEngineId]: { ...(prev[currentEngineId] || { hints: [] }), depth },
+    }));
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'set_depth', engineId: currentEngineId, depth }));
       setRawLogs((prev) => [...prev, `>> [${currentEngineId}] depth ${depth}`]);
@@ -414,7 +523,15 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const bestHint = engineStatus.hints[0];
+  const activeEngineStatus = engineTelemetry[currentEngineId] || {
+    name: currentEngineId,
+    connected: false,
+    state: 'waiting',
+    statusText: 'Connecting...',
+    hints: [],
+  };
+
+  const bestHint = activeEngineStatus.hints[0];
 
   // Eval score from Black's perspective
   const blackEvalScore =
@@ -455,10 +572,9 @@ export const App: React.FC = () => {
 
   const isBotMatch = gameState.mode === 'engine_vs_engine';
   const activeBotDepth = gameState.currentPlayer === 1 ? blackBotDepth : whiteBotDepth;
-  const activeDisplayDepth = isBotMatch ? activeBotDepth : (engineStatus.depth ?? gameState.engineDepth);
-  const activeBotName = isBotMatch
-    ? `${getEngineNameById(gameState.currentPlayer === 1 ? blackBotId : whiteBotId)} (${gameState.currentPlayer === 1 ? 'Black' : 'White'})`
-    : undefined;
+  const activeDisplayDepth = isBotMatch
+    ? activeBotDepth
+    : (activeEngineStatus.depth ?? gameState.engineDepth);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#161512] text-[#d0d0d0]">
@@ -491,10 +607,10 @@ export const App: React.FC = () => {
               whiteEngineId={whiteBotId}
               blackDepth={blackBotDepth}
               whiteDepth={whiteBotDepth}
-              onSelectBlackEngine={setBlackBotId}
-              onSelectWhiteEngine={setWhiteBotId}
-              onSelectBlackDepth={setBlackBotDepth}
-              onSelectWhiteDepth={setWhiteBotDepth}
+              onSelectBlackEngine={handleSelectBlackEngine}
+              onSelectWhiteEngine={handleSelectWhiteEngine}
+              onSelectBlackDepth={handleSelectBlackDepth}
+              onSelectWhiteDepth={handleSelectWhiteDepth}
               isRunning={isBotMatchRunning}
               onToggleRunning={() => {
                 setIsBotMatchRunning((prev) => {
@@ -564,7 +680,7 @@ export const App: React.FC = () => {
             {/* Engine Analysis & Protocol Panel */}
             <div className="flex-1">
               <EnginePanel
-                engineStatus={engineStatus}
+                engineStatus={activeEngineStatus}
                 availableEngines={availableEngines}
                 currentEngineId={currentEngineId}
                 onSwitchEngine={handleSwitchEngine}
@@ -574,7 +690,30 @@ export const App: React.FC = () => {
                 currentDepth={activeDisplayDepth}
                 rawLogs={rawLogs}
                 isBotMatch={isBotMatch}
-                activeBotName={activeBotName}
+                blackBotName={getEngineNameById(blackBotId)}
+                whiteBotName={getEngineNameById(whiteBotId)}
+                blackBotTelemetry={{
+                  ...(engineTelemetry[blackBotId] || {
+                    name: blackBotId,
+                    connected: true,
+                    state: 'waiting',
+                    statusText: 'Ready',
+                    hints: [],
+                  }),
+                  depth: blackBotDepth,
+                }}
+                whiteBotTelemetry={{
+                  ...(engineTelemetry[whiteBotId] || {
+                    name: whiteBotId,
+                    connected: true,
+                    state: 'waiting',
+                    statusText: 'Ready',
+                    hints: [],
+                  }),
+                  depth: whiteBotDepth,
+                }}
+                currentTurn={gameState.currentPlayer}
+                isBotMatchRunning={isBotMatchRunning}
               />
             </div>
           </div>

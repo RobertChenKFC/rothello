@@ -149,9 +149,10 @@ export class NBoardEngineBridge extends EventEmitter {
     // 4. Node stats: nodestats <nodes> <time>
     if (line.startsWith('nodestats ')) {
       const parts = line.substring(10).trim().split(/\s+/);
-      const nodes = parseInt(parts[0], 10);
-      const time = parseFloat(parts[1]);
-      const nps = time > 0 ? Math.round(nodes / time) : 0;
+      const nodes = parseInt(parts[0], 10) || 0;
+      const time = parseFloat(parts[1]) || 0;
+      const effectiveTime = time > 0.0005 ? time : (nodes > 0 ? 0.001 : 0);
+      const nps = effectiveTime > 0 ? Math.round(nodes / effectiveTime) : 0;
       this.emit('nodestats', { nodes, time, nps });
       return;
     }

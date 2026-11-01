@@ -322,7 +322,7 @@ export class BuiltinNBoardEngine {
   }
 
   private searchBestMove(): { bestMove: string; bestScore: number; timeSec: number } {
-    const startTime = Date.now();
+    const startTime = performance.now();
     this.nodes = 0;
     const moves = generateMoves(this.board, this.turn);
 
@@ -346,10 +346,14 @@ export class BuiltinNBoardEngine {
         bestScore = score;
         bestMove = coordToAlg(m.r, m.c);
       }
+
+      // Stream incremental nodestats for live telemetry
+      const elapsedSec = (performance.now() - startTime) / 1000;
+      this.sendOutput(`nodestats ${this.nodes} ${elapsedSec.toFixed(3)}`);
     }
 
-    const timeSec = (Date.now() - startTime) / 1000;
-    this.sendOutput(`nodestats ${this.nodes} ${timeSec.toFixed(2)}`);
+    const timeSec = (performance.now() - startTime) / 1000;
+    this.sendOutput(`nodestats ${this.nodes} ${timeSec.toFixed(3)}`);
     return {
       bestMove,
       bestScore: Math.max(-64, Math.min(64, bestScore)),

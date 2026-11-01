@@ -30,6 +30,8 @@ export interface EngineStatus {
   hints: EngineHint[];
   bestMove?: string;
   bestScore?: number;
+  lastMove?: string;
+  lastScore?: number;
 }
 
 export type GameMode = 'human_vs_engine' | 'engine_vs_engine' | 'analysis' | 'pass_and_play';
