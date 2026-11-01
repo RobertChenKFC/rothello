@@ -10,6 +10,8 @@ export interface SprtConfig {
   beta: number; // Type II error rate (default 0.05)
 }
 
+export type EloSignificance = 'positive' | 'negative' | 'inconclusive';
+
 export interface SprtResult {
   llr: number;
   lowerBound: number;
@@ -21,6 +23,7 @@ export interface SprtResult {
   eloMin: number;
   eloMax: number;
   winRate: number;
+  significance: EloSignificance;
 }
 
 export interface PentanomialStats {
@@ -97,26 +100,31 @@ export class SprtCalculator {
         eloMin: 0,
         eloMax: 0,
         winRate: 0.5,
+        significance: 'inconclusive',
       };
     }
 
-    const score = (wins + 0.5 * draws) / totalGames;
-    const winRate = score;
+    const rawScore = (wins + 0.5 * draws) / totalGames;
+    const winRate = rawScore;
+
+    // Apply Laplace prior (1 pseudo-win, 1 pseudo-loss) to prevent extreme score
+    // explosion on small sample sizes (e.g. 2-0 -> +1200 Elo)
+    const smoothedScore = (wins + 0.5 * draws + 1.0) / (totalGames + 2.0);
 
     // Variance of individual game score
     // Var(X) = E[X^2] - (E[X])^2 = (W + 0.25 * D) / N - score^2
     const varScore = Math.max(
       1e-6,
-      (wins + 0.25 * draws) / totalGames - score * score
+      (wins + 0.25 * draws) / totalGames - rawScore * rawScore
     );
     const stdDevScore = Math.sqrt(varScore / totalGames);
 
     // 95% Confidence Interval z-score = 1.95996
     const z = 1.95996;
-    const scoreMin = Math.max(0.001, Math.min(0.999, score - z * stdDevScore));
-    const scoreMax = Math.max(0.001, Math.min(0.999, score + z * stdDevScore));
+    const scoreMin = Math.max(0.001, Math.min(0.999, smoothedScore - z * stdDevScore));
+    const scoreMax = Math.max(0.001, Math.min(0.999, smoothedScore + z * stdDevScore));
 
-    const elo = SprtCalculator.scoreToElo(Math.max(0.001, Math.min(0.999, score)));
+    const elo = SprtCalculator.scoreToElo(Math.max(0.001, Math.min(0.999, smoothedScore)));
     const eloMin = SprtCalculator.scoreToElo(scoreMin);
     const eloMax = SprtCalculator.scoreToElo(scoreMax);
     const eloError = Math.max(Math.abs(eloMax - elo), Math.abs(elo - eloMin));
@@ -130,7 +138,7 @@ export class SprtCalculator {
     let llr = 0;
     if (varScore > 0) {
       llr =
-        ((s1 - s0) * (totalGames * score - (totalGames * (s0 + s1)) / 2)) /
+        ((s1 - s0) * (totalGames * rawScore - (totalGames * (s0 + s1)) / 2)) /
         (varScore * totalGames);
     }
 
@@ -139,6 +147,17 @@ export class SprtCalculator {
       status = 'passed';
     } else if (llr <= this.lowerBound) {
       status = 'failed';
+    }
+
+    // Statistical significance:
+    // positive: SPRT passed OR 95% CI is strictly positive (eloMin > 0) with at least 8 games
+    // negative: SPRT failed OR 95% CI is strictly negative (eloMax < 0) with at least 8 games
+    // inconclusive: CI spans across zero (noise / within margin of error)
+    let significance: EloSignificance = 'inconclusive';
+    if (status === 'passed' || (totalGames >= 8 && eloMin > 0)) {
+      significance = 'positive';
+    } else if (status === 'failed' || (totalGames >= 8 && eloMax < 0)) {
+      significance = 'negative';
     }
 
     const cleanElo = isFinite(elo) ? elo : 0;
@@ -155,6 +174,7 @@ export class SprtCalculator {
       eloMin: isFinite(eloMin) ? eloMin : -100,
       eloMax: isFinite(eloMax) ? eloMax : 100,
       winRate,
+      significance,
     };
   }
 }

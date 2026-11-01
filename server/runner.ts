@@ -86,6 +86,7 @@ export interface Experiment {
     estimatedElo: number; // Candidate absolute estimated Elo
     eloError: number;
     llr: number;
+    significance: 'positive' | 'negative' | 'inconclusive';
     pentanomial: PentanomialStats;
     candidateAvgNodes: number;
     candidateAvgNps: number;
@@ -146,6 +147,16 @@ export class ExperimentManager {
     } catch (err) {
       console.error('Failed to write experiment ledger:', err);
     }
+  }
+
+  public clearAllExperiments() {
+    this.stopCurrentRun();
+    this.experiments.clear();
+    this.activeExperiment = null;
+    this.saveLedger();
+    this.broadcastCb({
+      type: 'experiments_cleared',
+    });
   }
 
   public getGitInfo(): GitInfo {
@@ -275,6 +286,7 @@ export class ExperimentManager {
         estimatedElo: baselineAnchorElo,
         eloError: 0,
         llr: 0,
+        significance: 'inconclusive',
         pentanomial: { ww: 0, wd: 0, wlOrDd: 0, ld: 0, ll: 0 },
         candidateAvgNodes: 0,
         candidateAvgNps: 0,
@@ -395,6 +407,7 @@ export class ExperimentManager {
         exp.stats.estimatedElo = sprtResult.estimatedElo;
         exp.stats.eloError = sprtResult.eloError;
         exp.stats.winRate = sprtResult.winRate;
+        exp.stats.significance = sprtResult.significance;
 
         // Check SPRT termination
         if (exp.type === 'sprt') {

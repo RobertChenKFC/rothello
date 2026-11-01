@@ -196,6 +196,11 @@ app.post('/api/experiments/stop', (req, res) => {
   res.json({ status: 'stopped' });
 });
 
+app.delete('/api/experiments', (req, res) => {
+  experimentManager.clearAllExperiments();
+  res.json({ status: 'cleared' });
+});
+
 app.post('/api/benchmark', async (req, res) => {
   try {
     const engineId = req.body.engineId || 'rothello-rust';

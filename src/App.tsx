@@ -117,6 +117,12 @@ export const App: React.FC = () => {
       try {
         const msg = JSON.parse(event.data);
 
+        if (msg.type === 'experiments_cleared') {
+          setExperiments([]);
+          setActiveExperiment(null);
+          return;
+        }
+
         if (msg.type === 'experiment_updated') {
           setActiveExperiment(msg.experiment);
           setExperiments((prev) => {
@@ -554,6 +560,16 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleClearExperiments = async () => {
+    try {
+      await fetch('/api/experiments', { method: 'DELETE' });
+      setExperiments([]);
+      setActiveExperiment(null);
+    } catch (err) {
+      console.error('Failed to clear experiments:', err);
+    }
+  };
+
   const handleRunBenchmark = async (engineId: string, depth: number) => {
     const res = await fetch('/api/benchmark', {
       method: 'POST',
@@ -698,6 +714,7 @@ export const App: React.FC = () => {
             gitInfo={gitInfo}
             onStartExperiment={handleStartExperiment}
             onStopExperiment={handleStopExperiment}
+            onClearExperiments={handleClearExperiments}
             onReplayGame={handleReplayGame}
             onRunBenchmark={handleRunBenchmark}
           />
