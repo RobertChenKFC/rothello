@@ -7,7 +7,9 @@
     "dev": "concurrently -n \"server,ui\" -c \"yellow,blue\" \"npm run server\" \"npm run ui\"",
     "server": "tsx server/index.ts",
     "ui": "vite",
+    "build:engine": "cargo build --release --manifest-path engine/Cargo.toml",
     "build": "tsc && vite build",
+    "build:all": "npm run build:engine && npm run build",
     "preview": "vite preview"
   },
   "keywords": [
