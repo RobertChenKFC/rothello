@@ -110,6 +110,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
+  const [benchmarkDepth, setBenchmarkDepth] = useState<number>(10);
   const [benchmarkReport, setBenchmarkReport] = useState<any | null>(null);
 
   // Selected experiment to display in the primary monitor card
@@ -130,10 +131,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return est > max ? est : max;
   }, 1500);
 
-  const handleRunDiagnostic = async () => {
+  const handleRunDiagnostic = async (depth: number = benchmarkDepth) => {
     setIsBenchmarkRunning(true);
     try {
-      const report = await onRunBenchmark('rothello-rust', 6);
+      const report = await onRunBenchmark('rothello-rust', depth);
       setBenchmarkReport(report);
     } catch (err) {
       console.error('Benchmark failed:', err);
@@ -267,14 +268,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           )}
 
-          <button
-            onClick={handleRunDiagnostic}
-            disabled={isBenchmarkRunning}
-            className="flex items-center space-x-1.5 px-3 py-2 bg-[#25221d] hover:bg-[#332f28] border border-[#38342e] rounded-lg text-xs font-semibold text-gray-200 transition"
-          >
-            <Zap size={14} className={isBenchmarkRunning ? 'text-yellow-400 animate-spin' : 'text-yellow-400'} />
-            <span>{isBenchmarkRunning ? 'Benchmarking...' : 'Quick Benchmark'}</span>
-          </button>
+          {/* Benchmark Duration Preset & Trigger */}
+          <div className="flex items-center space-x-1.5 bg-[#25221d] border border-[#38342e] rounded-lg p-1 text-xs">
+            <button
+              onClick={() => handleRunDiagnostic(benchmarkDepth)}
+              disabled={isBenchmarkRunning}
+              className="flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-gray-200 hover:text-white transition disabled:opacity-50"
+              title="Run steady-state diagnostic benchmark"
+            >
+              <Zap
+                size={14}
+                className={
+                  isBenchmarkRunning
+                    ? 'text-yellow-400 animate-spin'
+                    : 'text-yellow-400'
+                }
+              />
+              <span>{isBenchmarkRunning ? 'Benchmarking...' : 'Benchmark'}</span>
+            </button>
+
+            <select
+              value={benchmarkDepth}
+              onChange={(e) => setBenchmarkDepth(parseInt(e.target.value, 10))}
+              disabled={isBenchmarkRunning}
+              className="bg-[#1b1916] text-yellow-400 font-mono text-[11px] rounded px-2 py-1 border border-[#312e29] focus:outline-none cursor-pointer"
+              title="Select search depth preset (longer search reaches steady state)"
+            >
+              <option value={8}>Depth 8 (~0.2s, 750k nodes)</option>
+              <option value={10}>Depth 10 (~2s, 8M nodes - Steady State)</option>
+              <option value={11}>Depth 11 (~8s, 35M nodes - Stress Test)</option>
+              <option value={12}>Depth 12 (~25s, 100M+ nodes - Sustained)</option>
+            </select>
+          </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
@@ -293,21 +318,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-2">
               <Zap size={16} className="text-yellow-400" />
               <span className="font-bold text-sm text-white">
-                Diagnostic Benchmark Report ({benchmarkReport.engineName})
+                Steady-State Benchmark Report ({benchmarkReport.engineName} - Depth {benchmarkReport.searchDepth})
               </span>
             </div>
             <button
               onClick={() => setBenchmarkReport(null)}
-              className="text-gray-500 hover:text-white text-xs"
+              className="text-gray-500 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-[#25221d] transition"
             >
-              Close
+              ✕ Close
             </button>
           </div>
           <div className="grid grid-cols-4 gap-3 text-center">
             <div className="bg-[#141311] p-2 rounded border border-[#2d2a25]">
-              <div className="text-[10px] text-gray-500 uppercase">Throughput</div>
+              <div className="text-[10px] text-gray-500 uppercase">Steady-State Throughput</div>
               <div className="text-sm font-bold font-mono text-yellow-400">
-                {(benchmarkReport.nps / 1000).toFixed(0)}k NPS
+                {(benchmarkReport.nps / 1_000_000).toFixed(2)}M NPS
               </div>
             </div>
             <div className="bg-[#141311] p-2 rounded border border-[#2d2a25]">
@@ -317,13 +342,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="bg-[#141311] p-2 rounded border border-[#2d2a25]">
-              <div className="text-[10px] text-gray-500 uppercase">Total Nodes</div>
+              <div className="text-[10px] text-gray-500 uppercase">Total Nodes Searched</div>
               <div className="text-sm font-bold font-mono text-gray-200">
                 {benchmarkReport.totalNodes.toLocaleString()}
               </div>
             </div>
             <div className="bg-[#141311] p-2 rounded border border-[#2d2a25]">
-              <div className="text-[10px] text-gray-500 uppercase">Elapsed Time</div>
+              <div className="text-[10px] text-gray-500 uppercase">Sustained Time</div>
               <div className="text-sm font-bold font-mono text-gray-200">
                 {benchmarkReport.totalTimeSec.toFixed(2)}s
               </div>

@@ -635,7 +635,7 @@ export class ExperimentManager {
 
   /**
    * Diagnostic Benchmark Suite runner.
-   * Tests candidate engine across benchmark positions to compute NPS, EBF, and Move Agreement.
+   * Runs CPU warmup and tests candidate engine across benchmark positions to compute steady-state NPS, EBF, and Move Agreement.
    */
   public async runBenchmark(
     engineId: string,
@@ -643,7 +643,23 @@ export class ExperimentManager {
     getEngine: (id: string) => NBoardEngineBridge
   ): Promise<BenchmarkReport> {
     const eng = getEngine(engineId);
+
+    // Warmup phase: prime CPU caches and turbo-boost clock frequency
+    eng.setGame(BENCHMARK_POSITIONS[0].ggf);
+    eng.setDepth(6);
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => resolve(), 1000);
+      const onMove = () => {
+        clearTimeout(timeout);
+        eng.off('move', onMove);
+        resolve();
+      };
+      eng.on('move', onMove);
+      eng.requestMove();
+    });
+
     eng.setDepth(depth);
+    const timeoutMs = Math.max(depth * 4000, 20000);
 
     const startTime = Date.now();
     let totalNodes = 0;
@@ -659,7 +675,7 @@ export class ExperimentManager {
           let score = 0;
           const timeout = setTimeout(
             () => resolve({ move: 'd3', nodes: 1000, score: 0 }),
-            2000
+            timeoutMs
           );
 
           const onNode = (data: any) => {
