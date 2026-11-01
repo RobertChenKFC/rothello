@@ -511,6 +511,7 @@ export const App: React.FC = () => {
                 onSetDepth={handleSetDepth}
                 currentDepth={gameState.engineDepth}
                 rawLogs={rawLogs}
+                isBotMatch={gameState.mode === 'engine_vs_engine'}
               />
             </div>
           </div>

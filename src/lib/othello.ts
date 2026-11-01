@@ -263,15 +263,16 @@ export function replayToMove(initialState: GameState, targetIndex: number): Game
 
 /**
  * Formats game into standard GGF string recognized by NBoard / Edax.
- * Format: (;GM[Othello]PC[NBoard]PB[Black]PW[White]RE[?]TI[15:00]TY[8];B[c4];W[c3]...)
+ * Format: (;GM[othello]B[c4]W[e3]...;)
  */
 export function toGGF(state: GameState): string {
-  let ggf = '(;GM[Othello]PC[Rothello]PB[Black]PW[White]RE[?]TI[15:00]TY[8]';
+  let ggf = '(;GM[othello]';
   const historyToExport = state.moveHistory.slice(0, state.currentMoveIndex);
 
   for (const move of historyToExport) {
     const colorTag = move.player === 1 ? 'B' : 'W';
-    ggf += `;${colorTag}[${move.algebraic}]`;
+    const alg = move.algebraic === 'pass' || move.algebraic === '--' ? 'pa' : move.algebraic;
+    ggf += `${colorTag}[${alg}]`;
   }
   ggf += ';)';
   return ggf;

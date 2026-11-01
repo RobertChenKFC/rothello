@@ -188,15 +188,15 @@ export class BuiltinNBoardEngine {
     this.resetBoard();
     if (!ggf) return;
 
-    // Matches ;B[c4] or ;W[d3]
-    const moveRegex = /;([BW])\[([a-h][1-8]|pass|--)\]/gi;
+    // Matches B[c4] or ;B[c4] or W[d3] or ;W[d3]
+    const moveRegex = /;?([BW])\[([a-h][1-8]|pass|pa|--)\]/gi;
     let match;
     while ((match = moveRegex.exec(ggf)) !== null) {
       const colorChar = match[1].toUpperCase();
       const alg = match[2].toLowerCase();
       const player = colorChar === 'B' ? 1 : -1;
       this.turn = player;
-      if (alg !== 'pass' && alg !== '--') {
+      if (alg !== 'pass' && alg !== 'pa' && alg !== '--') {
         const coord = algToCoord(alg);
         if (coord) {
           const flips = getFlips(this.board, coord.r, coord.c, player);

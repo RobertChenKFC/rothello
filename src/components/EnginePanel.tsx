@@ -12,6 +12,7 @@ interface EnginePanelProps {
   onSetDepth: (depth: number) => void;
   currentDepth: number;
   rawLogs: string[];
+  isBotMatch?: boolean;
 }
 
 export const EnginePanel: React.FC<EnginePanelProps> = ({
@@ -24,6 +25,7 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
   onSetDepth,
   currentDepth,
   rawLogs,
+  isBotMatch = false,
 }) => {
   const [showConsole, setShowConsole] = useState(false);
   const [showEngineDropdown, setShowEngineDropdown] = useState(false);
@@ -187,25 +189,37 @@ export const EnginePanel: React.FC<EnginePanelProps> = ({
           </div>
         )}
 
-        {/* Depth Control */}
-        <div className="pt-2 border-t border-[#312e29] space-y-1">
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <span className="flex items-center space-x-1">
-              <Sliders size={12} />
-              <span>Search Depth</span>
-            </span>
-            <span className="font-mono font-bold text-gray-200">{currentDepth}</span>
+        {/* Depth Control (single-engine modes) or Bot Match Indicator */}
+        {isBotMatch ? (
+          <div className="pt-2 border-t border-[#312e29]">
+            <div className="bg-[#161512] px-2.5 py-1.5 rounded border border-[#2d2a25] text-[11px] text-gray-400 flex items-center justify-between">
+              <span className="flex items-center space-x-1.5">
+                <Sliders size={12} className="text-yellow-500" />
+                <span>Bot Match Active</span>
+              </span>
+              <span className="text-gray-500 text-[10px]">Depths set in match bar above</span>
+            </div>
           </div>
-          <input
-            type="range"
-            min={4}
-            max={24}
-            step={2}
-            value={currentDepth}
-            onChange={(e) => onSetDepth(parseInt(e.target.value, 10))}
-            className="w-full accent-yellow-500 bg-[#312e29] h-1.5 rounded cursor-pointer"
-          />
-        </div>
+        ) : (
+          <div className="pt-2 border-t border-[#312e29] space-y-1">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span className="flex items-center space-x-1">
+                <Sliders size={12} />
+                <span>Search Depth</span>
+              </span>
+              <span className="font-mono font-bold text-gray-200">{currentDepth}</span>
+            </div>
+            <input
+              type="range"
+              min={2}
+              max={24}
+              step={2}
+              value={currentDepth}
+              onChange={(e) => onSetDepth(parseInt(e.target.value, 10))}
+              className="w-full accent-yellow-500 bg-[#312e29] h-1.5 rounded cursor-pointer"
+            />
+          </div>
+        )}
       </div>
 
       {/* Action Footer */}

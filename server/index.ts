@@ -46,7 +46,8 @@ const DEFAULT_ENGINES: EngineInfo[] = [
 ];
 
 const enginePool = new Map<string, NBoardEngineBridge>();
-let primaryEngineId = 'builtin';
+let primaryEngineId = 'edax';
+let currentGgf = '(;GM[othello];)';
 
 function broadcast(msg: object) {
   const json = JSON.stringify(msg);
@@ -76,13 +77,15 @@ function getEngine(engineId?: string): NBoardEngineBridge {
     const config = DEFAULT_ENGINES.find((e) => e.id === id) || DEFAULT_ENGINES[0];
     b = new NBoardEngineBridge(config);
     attachBridgeEvents(b, id);
+    b.setGame(currentGgf);
     enginePool.set(id, b);
   }
   return b;
 }
 
-// Pre-initialize default engine
+// Pre-initialize engines
 getEngine('builtin');
+getEngine('edax');
 
 wss.on('connection', (ws: WebSocket) => {
   const activeEngine = getEngine(primaryEngineId);
@@ -102,27 +105,21 @@ wss.on('connection', (ws: WebSocket) => {
 
       switch (data.type) {
         case 'set_game':
-          // If specific engineId given, sync that one; otherwise sync all active engines in pool
-          if (data.engineId) {
-            targetEngine.setGame(data.ggf);
-          } else {
-            enginePool.forEach((eng) => eng.setGame(data.ggf));
-          }
+          currentGgf = data.ggf;
+          enginePool.forEach((eng) => eng.setGame(currentGgf));
           break;
 
         case 'send_move':
-          if (data.engineId) {
-            targetEngine.sendMove(data.algebraic);
-          } else {
-            enginePool.forEach((eng) => eng.sendMove(data.algebraic));
-          }
+          enginePool.forEach((eng) => eng.sendMove(data.algebraic));
           break;
 
         case 'request_move':
+          targetEngine.setGame(currentGgf);
           targetEngine.requestMove();
           break;
 
         case 'request_hints':
+          targetEngine.setGame(currentGgf);
           targetEngine.requestHints(data.count || 5);
           break;
 
@@ -142,6 +139,7 @@ wss.on('connection', (ws: WebSocket) => {
           const config = data.config as EngineInfo;
           primaryEngineId = config.id;
           const eng = getEngine(config.id);
+          eng.setGame(currentGgf);
           broadcast({
             type: 'engine_connected',
             engineId: config.id,
