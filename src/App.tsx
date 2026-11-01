@@ -167,6 +167,7 @@ export const App: React.FC = () => {
           }
 
           case 'engine_error':
+            isEngineMovingRef.current = false;
             setEngineStatus((prev) => ({
               ...prev,
               state: 'error',
@@ -223,12 +224,15 @@ export const App: React.FC = () => {
   // Handle Turn logic for Engine
   useEffect(() => {
     if (gameState.isGameOver) return;
+    if (Object.keys(gameState.legalMoves).length === 0) return;
 
     if (gameState.mode === 'human_vs_engine') {
       const isEngineTurn = gameState.currentPlayer !== gameState.userColor;
       if (isEngineTurn && !isEngineMovingRef.current) {
         isEngineMovingRef.current = true;
+        let hasFired = false;
         const timer = setTimeout(() => {
+          hasFired = true;
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(
               JSON.stringify({
@@ -239,7 +243,12 @@ export const App: React.FC = () => {
             setRawLogs((prev) => [...prev, `>> [${currentEngineId}] go`]);
           }
         }, 300);
-        return () => clearTimeout(timer);
+        return () => {
+          clearTimeout(timer);
+          if (!hasFired) {
+            isEngineMovingRef.current = false;
+          }
+        };
       }
     } else if (gameState.mode === 'engine_vs_engine' && isBotMatchRunning) {
       if (!isEngineMovingRef.current) {
@@ -247,7 +256,9 @@ export const App: React.FC = () => {
         const activeBotId = gameState.currentPlayer === 1 ? blackBotId : whiteBotId;
         const activeDepth = gameState.currentPlayer === 1 ? blackBotDepth : whiteBotDepth;
 
+        let hasFired = false;
         const timer = setTimeout(() => {
+          hasFired = true;
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             // Ensure depth is set
             wsRef.current.send(
@@ -266,11 +277,18 @@ export const App: React.FC = () => {
             setRawLogs((prev) => [...prev, `>> [${activeBotId} (d=${activeDepth})] go`]);
           }
         }, botMoveDelay);
-        return () => clearTimeout(timer);
+        return () => {
+          clearTimeout(timer);
+          if (!hasFired) {
+            isEngineMovingRef.current = false;
+          }
+        };
       }
     }
   }, [
     gameState.currentPlayer,
+    gameState.currentMoveIndex,
+    gameState.legalMoves,
     gameState.mode,
     gameState.userColor,
     gameState.isGameOver,
@@ -282,6 +300,14 @@ export const App: React.FC = () => {
     botMoveDelay,
     currentEngineId,
   ]);
+
+  // When game ends during bot match, stop running
+  useEffect(() => {
+    if (gameState.isGameOver && isBotMatchRunning) {
+      setIsBotMatchRunning(false);
+      isEngineMovingRef.current = false;
+    }
+  }, [gameState.isGameOver, isBotMatchRunning]);
 
   // Automatically pass turn when current player has no moves but opponent does
   useEffect(() => {
@@ -470,8 +496,16 @@ export const App: React.FC = () => {
               onSelectBlackDepth={setBlackBotDepth}
               onSelectWhiteDepth={setWhiteBotDepth}
               isRunning={isBotMatchRunning}
-              onToggleRunning={() => setIsBotMatchRunning(!isBotMatchRunning)}
-              onStepMove={handleRequestEngineMove}
+              onToggleRunning={() => {
+                setIsBotMatchRunning((prev) => {
+                  if (prev) isEngineMovingRef.current = false;
+                  return !prev;
+                });
+              }}
+              onStepMove={() => {
+                isEngineMovingRef.current = false;
+                handleRequestEngineMove();
+              }}
               onResetMatch={handleNewGame}
               moveDelay={botMoveDelay}
               onMoveDelayChange={setBotMoveDelay}
