@@ -1,4 +1,5 @@
 use crate::bitboard::*;
+use crate::tt::ZOBRIST;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Color {
@@ -21,6 +22,7 @@ pub struct Board {
     pub black: u64,
     pub white: u64,
     pub side_to_move: Color,
+    pub hash: u64,
 }
 
 impl Board {
@@ -30,11 +32,35 @@ impl Board {
         // White on d4 (27) and e5 (36)
         let black = (1u64 << 35) | (1u64 << 28);
         let white = (1u64 << 27) | (1u64 << 36);
-        Self {
+        let mut board = Self {
             black,
             white,
             side_to_move: Color::Black,
+            hash: 0,
+        };
+        board.hash = board.compute_full_hash();
+        board
+    }
+
+    /// Computes full Zobrist hash from scratch.
+    pub fn compute_full_hash(&self) -> u64 {
+        let mut h = 0u64;
+        let mut b = self.black;
+        while b != 0 {
+            let sq = b.trailing_zeros() as usize;
+            h ^= ZOBRIST.pieces[0][sq];
+            b &= b - 1;
         }
+        let mut w = self.white;
+        while w != 0 {
+            let sq = w.trailing_zeros() as usize;
+            h ^= ZOBRIST.pieces[1][sq];
+            w &= w - 1;
+        }
+        if self.side_to_move == Color::White {
+            h ^= ZOBRIST.side;
+        }
+        h
     }
 
     #[inline(always)]
@@ -81,6 +107,16 @@ impl Board {
         let new_player = player | move_bit | flips;
         let new_opp = opponent ^ flips;
 
+        let player_idx = if self.side_to_move == Color::Black { 0 } else { 1 };
+        self.hash ^= ZOBRIST.pieces[player_idx][sq as usize];
+        let mut f = flips;
+        while f != 0 {
+            let flip_sq = f.trailing_zeros() as usize;
+            self.hash ^= ZOBRIST.flip[flip_sq];
+            f &= f - 1;
+        }
+        self.hash ^= ZOBRIST.side;
+
         match self.side_to_move {
             Color::Black => {
                 self.black = new_player;
@@ -101,6 +137,7 @@ impl Board {
     pub fn pass(&mut self) -> bool {
         if self.legal_moves() == 0 {
             self.side_to_move = self.side_to_move.opponent();
+            self.hash ^= ZOBRIST.side;
             true
         } else {
             false
@@ -182,5 +219,18 @@ mod tests {
         assert_eq!(board.side_to_move, Color::White);
         let (b, w) = board.disc_count();
         assert_eq!(b + w, 7);
+        assert_eq!(board.hash, board.compute_full_hash());
+    }
+
+    #[test]
+    fn test_incremental_zobrist() {
+        let mut board = Board::new();
+        assert_eq!(board.hash, board.compute_full_hash());
+        let moves = [19, 18, 26, 21, 20]; // some typical squares
+        for &m in &moves {
+            if board.make_move(m) {
+                assert_eq!(board.hash, board.compute_full_hash(), "Hash mismatch after move {}", m);
+            }
+        }
     }
 }
