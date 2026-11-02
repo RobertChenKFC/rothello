@@ -132,11 +132,49 @@ ${
     console.warn(`   Run "git push -u origin ${currentBranch}" manually if needed.`);
   }
 
-  // 7. Attempt PR creation via GitHub CLI (gh)
-  const hasGh = getGitOutput('which gh');
-  let ghCreated = false;
+  // 7. Attempt PR creation via GitHub REST API or GitHub CLI (gh)
+  const remoteUrl = getGitOutput('git remote get-url origin');
+  let repoName = 'RobertChenKFC/rothello';
+  const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+  if (match) repoName = match[1];
 
-  if (hasGh) {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  let prCreated = false;
+
+  if (token) {
+    try {
+      console.log('Creating Pull Request via GitHub REST API...');
+      const response = await fetch(`https://api.github.com/repos/${repoName}/pulls`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'Rothello-PR-Automation',
+        },
+        body: JSON.stringify({
+          title,
+          head: currentBranch,
+          base: 'master',
+          body: prBody,
+        }),
+      });
+
+      const resData = (await response.json()) as any;
+      if (response.ok && resData.html_url) {
+        console.log(`\n🎉 Pull Request successfully created via GitHub API!`);
+        console.log(`👉 ${resData.html_url}\n`);
+        prCreated = true;
+      } else {
+        console.warn(`GitHub API notice: ${resData.message || response.statusText}`);
+      }
+    } catch (e: any) {
+      console.warn(`Could not reach GitHub API: ${e.message}`);
+    }
+  }
+
+  const hasGh = getGitOutput('which gh');
+  if (!prCreated && hasGh) {
     try {
       console.log('Checking GitHub CLI authentication...');
       execSync('gh auth status', { stdio: 'ignore' });
@@ -147,18 +185,13 @@ ${
       ).trim();
       console.log(`\n🎉 Pull Request successfully created!`);
       console.log(`👉 ${ghOutput}\n`);
-      ghCreated = true;
+      prCreated = true;
     } catch {
       // gh not logged in or failed
     }
   }
 
-  if (!ghCreated) {
-    const remoteUrl = getGitOutput('git remote get-url origin');
-    let repoName = 'RobertChenKFC/rothello';
-    const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
-    if (match) repoName = match[1];
-
+  if (!prCreated) {
     const prUrl = `https://github.com/${repoName}/compare/master...${currentBranch}?expand=1`;
 
     console.log('\n===========================================================');
@@ -167,7 +200,9 @@ ${
     console.log(`Title: ${title}`);
     console.log(`Create PR directly in browser:`);
     console.log(`👉 ${prUrl}`);
-    console.log(`(PR description has been saved to PR_DESCRIPTION.md for copy-paste)`);
+    console.log(`\n💡 To create PRs automatically without opening the browser:`);
+    console.log(`   Export a GitHub token: export GITHUB_TOKEN=ghp_...`);
+    console.log(`   Or authenticate GitHub CLI: gh auth login`);
     console.log('===========================================================\n');
   }
 
