@@ -139,7 +139,7 @@ export class SprtCalculator {
     if (varScore > 0) {
       llr =
         ((s1 - s0) * (totalGames * rawScore - (totalGames * (s0 + s1)) / 2)) /
-        (varScore * totalGames);
+        varScore;
     }
 
     let status: 'running' | 'passed' | 'failed' = 'running';
