@@ -10,6 +10,10 @@
     "build:engine": "cargo build --release --manifest-path engine/Cargo.toml",
     "build": "tsc && vite build",
     "build:all": "npm run build:engine && npm run build",
+    "test:engine": "cargo test --manifest-path engine/Cargo.toml",
+    "test:ui": "tsc --noEmit",
+    "test:integration": "npm run build:engine && tsx server/test-integration.ts",
+    "test": "npm run test:engine && npm run test:ui && npm run test:integration",
     "preview": "vite preview"
   },
   "keywords": [
