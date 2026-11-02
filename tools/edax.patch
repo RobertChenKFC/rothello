@@ -1,0 +1,57 @@
+diff --git a/src/nboard.c b/src/nboard.c
+index 65dec24..d0648ac 100644
+--- a/src/nboard.c
++++ b/src/nboard.c
+@@ -66,12 +66,15 @@ static void nboard_send_move(Result *result)
+ 
+ static void nboard_observer(Result *result)
+ {
++	char move[4];
++	move_to_string(result->move, WHITE, move);
+ 	if (log_is_open(nboard_log)) {
+ 		fprintf(nboard_log->f, "edax> ");
+ 		result_print(result, nboard_log->f);
+ 		putc('\n', nboard_log->f);
+ 	}
+-	nboard_send("nodestats %lld %.2f", result->n_nodes, result->time);
++	nboard_send("search %s %.2f %lld %d", move, 1.0 * result->score, (long long)(result->time / 10), result->depth);
++	nboard_send("nodestats %lld %.2f", result->n_nodes, 0.001 * result->time);
+ }
+ 
+ /**
+@@ -135,8 +138,22 @@ void ui_loop_nboard(UI *ui)
+ 
+ 		} else if (strcmp(cmd, "depth") == 0) {
+ 			options.level = string_to_int(param, 21);
++			options.play_type = EDAX_FIXED_LEVEL;
+ 			nboard_send("set myname Edax%d", options.level);
+ 
++		} else if (strcmp(cmd, "time") == 0) {
++			double t = string_to_real(param, 0.0);
++			if (t > 0.001) {
++				options.time = (int64_t)(t * 1000.0);
++				options.play_type = EDAX_TIME_PER_MOVE;
++				options.level = 60;
++			} else {
++				options.play_type = EDAX_FIXED_LEVEL;
++			}
++
++		} else if (strcmp(cmd, "book") == 0) {
++			options.book_allowed = string_to_boolean(param);
++
+ 		} else if (strcmp(cmd, "game") == 0) {
+ 			Game game;
+ 			if (parse_ggf(&game, param, &pass) != param) {
+diff --git a/src/search.c b/src/search.c
+index 9f87afd..8794f2b 100644
+--- a/src/search.c
++++ b/src/search.c
+@@ -684,7 +684,7 @@ void search_check_timeout(Search *search)
+ 	if (search_get_state(search) != STOP_TIMEOUT) {
+ 		t = search_time(master);
+ 		if (t > master->time.extra) {
+-			printf("*** SEARCH STILL RUNNING ? (%d) ***\n", search_get_state(search));
++			info("*** SEARCH STILL RUNNING ? (%d) ***\n", search_get_state(search));
+ 			search_set_state(search, STOP_TIMEOUT);
+ 		}
+ 	}

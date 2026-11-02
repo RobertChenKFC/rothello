@@ -81,6 +81,7 @@ export class BuiltinNBoardEngine {
   private board: number[] = new Array(64).fill(0);
   private turn: number = 1;
   private depth: number = 6;
+  private timeLimitSec: number | null = null;
   private name: string = 'Rothello-Eval';
   private nodes: number = 0;
   private sendOutput: (line: string) => void;
@@ -117,12 +118,21 @@ export class BuiltinNBoardEngine {
         if (cmd === 'depth' || parts[1] === 'depth') {
           const d = parseInt(cmd === 'depth' ? parts[1] : parts[2], 10);
           if (!isNaN(d) && d > 0) {
-            this.depth = Math.min(d, 12);
+            this.depth = Math.min(d, 14);
+            this.timeLimitSec = null;
             this.sendOutput(`set myname ${this.name} ${this.depth}`);
           }
+        } else if (parts[1] === 'time') {
+          const t = parseFloat(parts[2]);
+          this.timeLimitSec = !isNaN(t) && t > 0.001 ? t : null;
         } else if (parts[1] === 'game') {
           this.parseGGF(parts.slice(2).join(' '));
         }
+        break;
+      }
+      case 'time': {
+        const t = parseFloat(param || parts[1]);
+        this.timeLimitSec = !isNaN(t) && t > 0.001 ? t : null;
         break;
       }
       case 'game': {
@@ -332,24 +342,75 @@ export class BuiltinNBoardEngine {
 
     let bestMove = coordToAlg(moves[0].r, moves[0].c);
     let bestScore = -Infinity;
-    const searchDepth = Math.min(this.depth, 8);
 
-    moves.sort((a, b) => POSITIONAL_WEIGHTS[b.r * 8 + b.c] - POSITIONAL_WEIGHTS[a.r * 8 + a.c]);
+    if (this.timeLimitSec) {
+      // Iterative deepening with strict time allocation
+      const targetTimeSec = this.timeLimitSec;
+      const maxDepth = 16;
 
-    for (const m of moves) {
-      const newBoard = [...this.board];
-      newBoard[m.r * 8 + m.c] = this.turn;
-      for (const f of m.flips) newBoard[f] = this.turn;
+      for (let d = 1; d <= maxDepth; d++) {
+        let iterBestMove = bestMove;
+        let iterBestScore = -Infinity;
+        let depthAborted = false;
 
-      const score = -this.alphaBeta(newBoard, searchDepth - 1, -10000, 10000, -this.turn, false);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMove = coordToAlg(m.r, m.c);
+        // Order root moves with current best move first
+        moves.sort((a, b) => {
+          const algA = coordToAlg(a.r, a.c);
+          const algB = coordToAlg(b.r, b.c);
+          if (algA === bestMove) return -1;
+          if (algB === bestMove) return 1;
+          return POSITIONAL_WEIGHTS[b.r * 8 + b.c] - POSITIONAL_WEIGHTS[a.r * 8 + a.c];
+        });
+
+        for (const m of moves) {
+          const newBoard = [...this.board];
+          newBoard[m.r * 8 + m.c] = this.turn;
+          for (const f of m.flips) newBoard[f] = this.turn;
+
+          const score = -this.alphaBeta(newBoard, d - 1, -10000, 10000, -this.turn, false);
+          if (score > iterBestScore) {
+            iterBestScore = score;
+            iterBestMove = coordToAlg(m.r, m.c);
+          }
+
+          const elapsedSec = (performance.now() - startTime) / 1000;
+          if (elapsedSec >= targetTimeSec) {
+            depthAborted = true;
+            break;
+          }
+        }
+
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        if (!depthAborted || d === 1) {
+          bestMove = iterBestMove;
+          bestScore = iterBestScore;
+          this.sendOutput(`search ${bestMove} ${bestScore.toFixed(2)} ${Math.round(elapsedSec * 100)} ${d}`);
+        }
+        this.sendOutput(`nodestats ${this.nodes} ${elapsedSec.toFixed(3)}`);
+
+        if (depthAborted || elapsedSec >= targetTimeSec * 0.55) {
+          break;
+        }
       }
+    } else {
+      // Fixed depth search
+      const searchDepth = Math.min(this.depth, 10);
+      moves.sort((a, b) => POSITIONAL_WEIGHTS[b.r * 8 + b.c] - POSITIONAL_WEIGHTS[a.r * 8 + a.c]);
 
-      // Stream incremental nodestats for live telemetry
-      const elapsedSec = (performance.now() - startTime) / 1000;
-      this.sendOutput(`nodestats ${this.nodes} ${elapsedSec.toFixed(3)}`);
+      for (const m of moves) {
+        const newBoard = [...this.board];
+        newBoard[m.r * 8 + m.c] = this.turn;
+        for (const f of m.flips) newBoard[f] = this.turn;
+
+        const score = -this.alphaBeta(newBoard, searchDepth - 1, -10000, 10000, -this.turn, false);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = coordToAlg(m.r, m.c);
+        }
+
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        this.sendOutput(`nodestats ${this.nodes} ${elapsedSec.toFixed(3)}`);
+      }
     }
 
     const timeSec = (performance.now() - startTime) / 1000;

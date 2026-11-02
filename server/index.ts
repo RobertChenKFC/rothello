@@ -33,7 +33,7 @@ const DEFAULT_ENGINES: EngineInfo[] = [
     type: 'external',
     path: path.resolve(__dirname, '../tools/edax/bin/lEdax-native'),
     cwd: path.resolve(__dirname, '../tools/edax/bin'),
-    args: ['-nboard'],
+    args: ['-nboard', '-book-usage', 'off'],
     depth: 18,
   },
   {

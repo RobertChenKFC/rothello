@@ -65,6 +65,15 @@ impl NBoardLoop {
                     }
                 }
 
+                "game" => {
+                    if parts.len() >= 2 {
+                        let ggf = parts[1..].join(" ");
+                        if let Ok(b) = Board::from_ggf(&ggf) {
+                            self.board = b;
+                        }
+                    }
+                }
+
                 "set" => {
                     if parts.len() >= 3 && parts[1] == "game" {
                         let ggf = parts[2..].join(" ");

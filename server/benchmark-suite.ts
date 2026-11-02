@@ -23,12 +23,12 @@ export const BENCHMARK_POSITIONS: BenchmarkPosition[] = [
   {
     id: 'pos-3',
     name: 'Early Midgame Complex',
-    ggf: '(;GM[othello]B[f5]W[d6]B[c3]W[d3]B[c4]W[f4]B[c5]W[b4]B[c6]W[e3];)',
+    ggf: '(;GM[othello]B[f5]W[d6]B[c3]W[d3]B[c4]W[f4]B[c5]W[b4]B[c6]W[b3];)',
   },
   {
     id: 'pos-4',
     name: 'X-Square Trap',
-    ggf: '(;GM[othello]B[f5]W[d6]B[c5]W[f4]B[e3]W[c6]B[d3]W[b4]B[c3]W[b3];)',
+    ggf: '(;GM[othello]B[f5]W[d6]B[c5]W[f4]B[e3]W[c6]B[d3]W[b4]B[b5]W[a4];)',
   },
   {
     id: 'pos-5',
@@ -38,7 +38,7 @@ export const BENCHMARK_POSITIONS: BenchmarkPosition[] = [
   {
     id: 'pos-6',
     name: 'Midgame Center Control',
-    ggf: '(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[e7]W[d6]B[c5]W[g5]B[f7]W[e3];)',
+    ggf: '(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[d3]W[c5]B[e3]W[d6]B[c6]W[c4];)',
   },
   {
     id: 'pos-7',
@@ -53,7 +53,7 @@ export const BENCHMARK_POSITIONS: BenchmarkPosition[] = [
   {
     id: 'pos-9',
     name: 'Mobility Squeeze',
-    ggf: '(;GM[othello]B[c4]W[e3]B[f4]W[c5]B[d6]W[f5]B[e6]W[f6]B[c6]W[b5]B[d7]W[e7];)',
+    ggf: '(;GM[othello]B[c4]W[e3]B[f4]W[c5]B[d6]W[f5]B[e6]W[f6]B[c6]W[b5]B[d3]W[e7];)',
   },
   {
     id: 'pos-10',

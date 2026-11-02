@@ -1,0 +1,3 @@
+[submodule "tools/edax"]
+	path = tools/edax
+	url = https://github.com/abulmo/edax-reversi.git
