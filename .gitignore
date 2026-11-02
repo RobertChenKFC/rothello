@@ -4,3 +4,4 @@ dist/
 *.log
 engine/target/
 .experiments/
+*.tsbuildinfo

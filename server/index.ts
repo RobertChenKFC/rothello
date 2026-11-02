@@ -44,6 +44,14 @@ const DEFAULT_ENGINES: EngineInfo[] = [
     args: ['--nboard'],
     depth: 14,
   },
+  {
+    id: 'rothello-baseline',
+    name: 'Rothello Baseline (Master)',
+    type: 'external',
+    path: path.resolve(__dirname, '../engine/target/release/rothello-baseline'),
+    args: ['--nboard'],
+    depth: 14,
+  },
 ];
 
 const enginePool = new Map<string, NBoardEngineBridge>();
