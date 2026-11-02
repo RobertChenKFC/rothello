@@ -1,5 +1,182 @@
 [
   {
+    "id": "exp-1793585805365",
+    "name": "SPRT: feat/incremental-zobrist-killers (0747fe5) vs master",
+    "createdAt": "2026-11-02T02:16:45.365Z",
+    "status": "passed",
+    "type": "sprt",
+    "git": {
+      "commit": "0747fe5",
+      "message": "Implement Incremental Zobrist Hashing and Killer Move Heuristic (+10.4% NPS)",
+      "branch": "feat/incremental-zobrist-killers",
+      "author": "Robert Chen",
+      "isDirty": true,
+      "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/0747fe5"
+    },
+    "candidate": {
+      "engineId": "rothello-rust",
+      "name": "Rothello Candidate",
+      "controlType": "depth",
+      "depth": 6
+    },
+    "baseline": {
+      "engineId": "rothello-baseline",
+      "name": "Rothello Baseline (Master)",
+      "controlType": "depth",
+      "depth": 6
+    },
+    "sprtBounds": {
+      "elo0": 0,
+      "elo1": 5,
+      "lowerBound": -2.9444389791664403,
+      "upperBound": 2.9444389791664403
+    },
+    "baselineAnchorElo": 1500,
+    "stats": {
+      "totalGames": 10,
+      "wins": 6,
+      "draws": 0,
+      "losses": 4,
+      "winRate": 0.6,
+      "elo": 58.45121427129523,
+      "estimatedElo": 1558,
+      "eloError": 299.4331878414773,
+      "llr": 0.002890098210438224,
+      "significance": "inconclusive",
+      "pentanomial": {
+        "ww": 1,
+        "wd": 0,
+        "wlOrDd": 4,
+        "ld": 0,
+        "ll": 0
+      },
+      "candidateAvgNodes": 61333,
+      "candidateAvgNps": 3672641,
+      "candidateEbf": 0,
+      "baselineAvgNodes": 69735,
+      "baselineAvgNps": 3594577,
+      "baselineEbf": 0,
+      "avgDiscMargin": -1.4
+    },
+    "recentGames": [
+      {
+        "pairId": 5,
+        "openingName": "Tiger (Diagonal)",
+        "game1": {
+          "blackId": "rothello-rust",
+          "whiteId": "rothello-baseline",
+          "winner": "candidate",
+          "candDiscs": 37,
+          "baseDiscs": 27,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[d6]B[c5]W[f4]B[e3]W[c6]B[d3]W[f3]B[e6]W[f6]B[g4]W[g3]B[g5]W[h5]B[h4]W[h3]B[g6]W[h6]B[c7]W[b6]B[d7]W[b5]B[c4]W[b4]B[c3]W[f2]B[e2]W[e7]B[e8]W[b3]B[d2]W[f7]B[c2]W[c1]B[d1]W[e1]B[g1]W[f8]B[g2]W[b8]B[h2]W[b1]B[h7]W[f1]B[a1]W[h1]B[g8]W[d8]B[b2]W[h8]B[g7]W[a2]B[c8]W[b7]B[a5]W[a3]B[a4]W[a6]B[a8]W[pa]B[a7];)"
+        },
+        "game2": {
+          "blackId": "rothello-baseline",
+          "whiteId": "rothello-rust",
+          "winner": "candidate",
+          "candDiscs": 42,
+          "baseDiscs": 22,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[d6]B[c5]W[f4]B[e3]W[c6]B[d3]W[f3]B[e6]W[f6]B[g4]W[g3]B[g5]W[h5]B[h4]W[h3]B[g6]W[h6]B[c7]W[c4]B[b5]W[b3]B[c3]W[b4]B[a5]W[a4]B[a3]W[d7]B[d8]W[b6]B[f7]W[a6]B[a7]W[f8]B[e7]W[b8]B[f2]W[f1]B[g7]W[e8]B[g8]W[d2]B[d1]W[e2]B[e1]W[c1]B[c2]W[b7]B[h2]W[h1]B[g1]W[g2]B[a8]W[c8]B[b1]W[a1]B[h7]W[b2]B[a2]W[h8];)"
+        },
+        "candidatePairScore": 2
+      },
+      {
+        "pairId": 4,
+        "openingName": "Rose-Cow",
+        "game1": {
+          "blackId": "rothello-rust",
+          "whiteId": "rothello-baseline",
+          "winner": "candidate",
+          "candDiscs": 37,
+          "baseDiscs": 27,
+          "movesCount": 57,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[h5]B[h4]W[h7]B[c3]W[e8]B[g8]W[d7]B[g3]W[h2]B[c7]W[f3]B[d6]W[c5]B[c4]W[c6]B[b4]W[d3]B[b6]W[b7]B[g7]W[b8]B[e2]W[c8]B[a8]W[h8]B[b5]W[a6]B[e3]W[f2]B[a7]W[a5]B[f1]W[g1]B[h1]W[g2]B[a4]W[d1]B[e1]W[c2]B[d2]W[b2]B[b3]W[c1]B[a1]W[a3]B[b1]W[a2];)"
+        },
+        "game2": {
+          "blackId": "rothello-baseline",
+          "whiteId": "rothello-rust",
+          "winner": "baseline",
+          "candDiscs": 24,
+          "baseDiscs": 40,
+          "movesCount": 57,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[e8]B[g8]W[d7]B[c7]W[d6]B[c6]W[h5]B[h4]W[h7]B[c5]W[c8]B[b8]W[c4]B[d3]W[d2]B[c3]W[b3]B[b4]W[a4]B[c2]W[d1]B[e1]W[f1]B[e2]W[f2]B[e3]W[f3]B[g3]W[g7]B[c1]W[b2]B[g1]W[b6]B[a5]W[g2]B[h8]W[a6]B[b5]W[b7]B[a1]W[b1]B[a2]W[a3]B[a7]W[a8]B[h2]W[h1];)"
+        },
+        "candidatePairScore": 1
+      },
+      {
+        "pairId": 3,
+        "openingName": "Rose-Peacock",
+        "game1": {
+          "blackId": "rothello-rust",
+          "whiteId": "rothello-baseline",
+          "winner": "candidate",
+          "candDiscs": 37,
+          "baseDiscs": 27,
+          "movesCount": 58,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[h5]B[h4]W[h7]B[c3]W[e8]B[g8]W[d7]B[g3]W[h2]B[c7]W[f3]B[d6]W[c5]B[c4]W[c6]B[b4]W[d3]B[b6]W[b7]B[g7]W[b8]B[e2]W[c8]B[a8]W[h8]B[b5]W[a6]B[e3]W[f2]B[a7]W[a5]B[f1]W[g1]B[h1]W[g2]B[a4]W[d1]B[e1]W[c2]B[d2]W[b2]B[b3]W[c1]B[a1]W[a3]B[b1]W[a2];)"
+        },
+        "game2": {
+          "blackId": "rothello-baseline",
+          "whiteId": "rothello-rust",
+          "winner": "baseline",
+          "candDiscs": 24,
+          "baseDiscs": 40,
+          "movesCount": 58,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[e8]B[g8]W[d7]B[c7]W[d6]B[c6]W[h5]B[h4]W[h7]B[c5]W[c8]B[b8]W[c4]B[d3]W[d2]B[c3]W[b3]B[b4]W[a4]B[c2]W[d1]B[e1]W[f1]B[e2]W[f2]B[e3]W[f3]B[g3]W[g7]B[c1]W[b2]B[g1]W[b6]B[a5]W[g2]B[h8]W[a6]B[b5]W[b7]B[a1]W[b1]B[a2]W[a3]B[a7]W[a8]B[h2]W[h1];)"
+        },
+        "candidatePairScore": 1
+      },
+      {
+        "pairId": 2,
+        "openingName": "Rose-Heath",
+        "game1": {
+          "blackId": "rothello-rust",
+          "whiteId": "rothello-baseline",
+          "winner": "candidate",
+          "candDiscs": 37,
+          "baseDiscs": 27,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[d6]B[d7]W[g5]B[g6]W[f7]B[f8]W[c8]B[e7]W[h6]B[h4]W[e8]B[d8]W[g8]B[c3]W[h5]B[h7]W[g4]B[c7]W[b8]B[g3]W[c6]B[f4]W[e3]B[d3]W[f3]B[d2]W[c4]B[f2]W[g2]B[g7]W[h2]B[b5]W[h3]B[h1]W[h8]B[e2]W[f1]B[c5]W[b6]B[g1]W[e1]B[a6]W[a7]B[a8]W[b7]B[d1]W[a4]B[a5]W[b3]B[b4]W[b2]B[c2]W[a3]B[a1]W[c1]B[a2]W[b1];)"
+        },
+        "game2": {
+          "blackId": "rothello-baseline",
+          "whiteId": "rothello-rust",
+          "winner": "baseline",
+          "candDiscs": 19,
+          "baseDiscs": 45,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[d6]B[d7]W[g5]B[g6]W[f7]B[f8]W[c8]B[e7]W[h6]B[h4]W[h5]B[h7]W[g4]B[g3]W[f4]B[f3]W[e8]B[d8]W[g8]B[e3]W[h3]B[h2]W[d3]B[c4]W[f2]B[f1]W[b4]B[c2]W[e2]B[d1]W[e1]B[d2]W[c3]B[c1]W[g2]B[b2]W[b3]B[a3]W[a2]B[a1]W[b1]B[c6]W[c5]B[c7]W[b5]B[a4]W[a5]B[a6]W[b6]B[a7]W[g7]B[h8]W[b7]B[b8]W[a8]B[g1]W[h1];)"
+        },
+        "candidatePairScore": 1
+      },
+      {
+        "pairId": 1,
+        "openingName": "Rose (Parallel)",
+        "game1": {
+          "blackId": "rothello-rust",
+          "whiteId": "rothello-baseline",
+          "winner": "candidate",
+          "candDiscs": 37,
+          "baseDiscs": 27,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[h5]B[h4]W[h7]B[c3]W[e8]B[g8]W[d7]B[g3]W[h2]B[c7]W[f3]B[d6]W[c5]B[c4]W[c6]B[b4]W[d3]B[b6]W[b7]B[g7]W[b8]B[e2]W[c8]B[a8]W[h8]B[b5]W[a6]B[e3]W[f2]B[a7]W[a5]B[f1]W[g1]B[h1]W[g2]B[a4]W[d1]B[e1]W[c2]B[d2]W[b2]B[b3]W[c1]B[a1]W[a3]B[b1]W[a2];)"
+        },
+        "game2": {
+          "blackId": "rothello-baseline",
+          "whiteId": "rothello-rust",
+          "winner": "baseline",
+          "candDiscs": 19,
+          "baseDiscs": 45,
+          "movesCount": 56,
+          "ggf": "(;GM[othello]B[f5]W[f6]B[e6]W[f4]B[g4]W[e7]B[f7]W[g6]B[h6]W[h3]B[g5]W[f8]B[d8]W[e8]B[g8]W[d7]B[c7]W[d6]B[c6]W[h5]B[h4]W[h7]B[c5]W[c8]B[b8]W[c4]B[d3]W[b6]B[a6]W[d2]B[b3]W[b5]B[a4]W[a5]B[b4]W[c3]B[a3]W[b7]B[b2]W[c2]B[c1]W[b1]B[a1]W[a2]B[f3]W[e3]B[g3]W[e2]B[d1]W[e1]B[f1]W[f2]B[g1]W[g7]B[h8]W[g2]B[h2]W[h1]B[a7]W[a8];)"
+        },
+        "candidatePairScore": 1
+      }
+    ]
+  },
+  {
     "id": "exp-baseline-0",
     "name": "Baseline Reference: Rothello Rust Core (Master)",
     "createdAt": "2026-11-01T22:30:00.000Z",
