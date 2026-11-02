@@ -24,7 +24,7 @@ function parseArgs() {
     elo0: number;
     elo1: number;
   } = {
-    games: 20, // default 20 games (10 pairs)
+    games: 60, // default 60 games (30 balanced opening pairs)
     depth: 6,
     elo0: 0.0,
     elo1: 5.0,
@@ -511,7 +511,7 @@ async function runExperiment() {
   }
 
   if (experiment.status === 'running') {
-    experiment.status = experiment.stats.elo > 0 ? 'passed' : 'stopped';
+    experiment.status = 'inconclusive';
   }
 
   // Cleanup bridges

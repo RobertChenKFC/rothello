@@ -5,3 +5,4 @@ dist/
 engine/target/
 .experiments/
 *.tsbuildinfo
+PR_DESCRIPTION.md

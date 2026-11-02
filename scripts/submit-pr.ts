@@ -61,6 +61,22 @@ async function submitPr() {
   const eloFormatted = `${eloSign}${eloDiff.toFixed(1)} ± ${eloError.toFixed(1)} Elo`;
   const isPositive = eloDiff > 0 && latestExp.stats.significance !== 'negative';
 
+  // Merge qualification policy
+  const isPassed = latestExp.status === 'passed' && eloDiff > 0;
+  const isInconclusive =
+    latestExp.status === 'inconclusive' ||
+    latestExp.status === 'stopped' ||
+    latestExp.stats.significance === 'inconclusive';
+
+  let mergePolicyNotice = '';
+  if (isPassed) {
+    mergePolicyNotice = `> **✅ MERGE QUALIFIED**: This candidate demonstrates statistically significant positive Elo gain (**${eloFormatted}**) confirmed by SPRT H1 acceptance. Qualified to merge into \`master\`.`;
+  } else if (isInconclusive) {
+    mergePolicyNotice = `> **⚠️ INCONCLUSIVE / NOT QUALIFIED**: The candidate scored **${eloFormatted}**, but the 95% confidence interval spans across zero and SPRT significance bounds were not reached. **NOT qualified for merge to trunk**. Needs more games to prove statistical significance. Retaining PR for analysis.`;
+  } else {
+    mergePolicyNotice = `> **❌ REGRESSION DETECTED**: The candidate demonstrates negative Elo gain (**${eloFormatted}**). **NOT qualified for merge to trunk**. Retaining PR for analysis.`;
+  }
+
   const branchClean = currentBranch.replace(/^(feat|fix|refactor|perf)\//, '');
   const title = `feat(${branchClean}): [SPRT ${eloSign}${eloDiff.toFixed(1)} Elo] ${latestExp.git.message || branchClean}`;
 
@@ -97,11 +113,7 @@ Track this experiment and historical comparisons live on the GitHub Pages dashbo
 ---
 
 ### 🚦 Merge Qualification Policy
-${
-  isPositive
-    ? `> **✅ MERGE QUALIFIED**: This candidate demonstrates positive Elo gain (**${eloFormatted}**). Qualified to merge into \`master\`.`
-    : `> **⚠️ REGRESSION / INCONCLUSIVE**: This candidate demonstrates negative or neutral Elo gain (**${eloFormatted}**). The experiment is documented in the ledger and retained on this PR for analysis, but will not be merged into \`master\`.`
-}
+${mergePolicyNotice}
 `;
 
   // 4. Save PR description locally
@@ -127,48 +139,53 @@ ${
   try {
     execSync(`git push -u origin "${currentBranch}"`, { stdio: 'inherit' });
     console.log(`✅ Branch pushed successfully.`);
-  } catch (err) {
-    console.warn(`⚠️ Warning: git push encountered an error or network isolation.`);
-    console.warn(`   Run "git push -u origin ${currentBranch}" manually if needed.`);
+  } catch (err: any) {
+    console.error(`❌ Error pushing branch to origin: ${err.message}`);
+    process.exit(1);
   }
 
-  // 7. Attempt PR creation via GitHub CLI (gh)
+  // 7. Strictly enforce GitHub CLI (gh) installation and authentication
   const hasGh = getGitOutput('which gh');
-  let ghCreated = false;
-
-  if (hasGh) {
-    try {
-      console.log('Checking GitHub CLI authentication...');
-      execSync('gh auth status', { stdio: 'ignore' });
-      console.log('Creating Pull Request with gh CLI...');
-      const ghOutput = execSync(
-        `gh pr create --base master --head "${currentBranch}" --title "${title.replace(/"/g, '\\"')}" --body-file "${prFilePath}"`,
-        { encoding: 'utf-8' }
-      ).trim();
-      console.log(`\n🎉 Pull Request successfully created!`);
-      console.log(`👉 ${ghOutput}\n`);
-      ghCreated = true;
-    } catch {
-      // gh not logged in or failed
-    }
+  if (!hasGh) {
+    console.error('❌ Error: GitHub CLI ("gh") is not installed on this system.');
+    console.error('   Please install "gh" to automate Pull Request creation.');
+    process.exit(1);
   }
 
-  if (!ghCreated) {
-    const remoteUrl = getGitOutput('git remote get-url origin');
-    let repoName = 'RobertChenKFC/rothello';
-    const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
-    if (match) repoName = match[1];
+  try {
+    console.log('Verifying GitHub CLI authentication...');
+    execSync('gh auth status', { stdio: 'pipe' });
+  } catch (authErr: any) {
+    console.error('❌ Error: GitHub CLI ("gh") is not authenticated.');
+    console.error('   Please run "gh auth login" in your terminal first.');
+    process.exit(1);
+  }
 
-    const prUrl = `https://github.com/${repoName}/compare/master...${currentBranch}?expand=1`;
+  console.log('Creating Pull Request via gh CLI...');
+  try {
+    const ghOutput = execSync(
+      `gh pr create --base master --head "${currentBranch}" --title "${title.replace(/"/g, '\\"')}" --body-file "${prFilePath}"`,
+      { encoding: 'utf-8' }
+    ).trim();
 
-    console.log('\n===========================================================');
-    console.log('📋 Pull Request Details Ready');
-    console.log('===========================================================');
-    console.log(`Title: ${title}`);
-    console.log(`Create PR directly in browser:`);
-    console.log(`👉 ${prUrl}`);
-    console.log(`(PR description has been saved to PR_DESCRIPTION.md for copy-paste)`);
-    console.log('===========================================================\n');
+    console.log(`\n🎉 Pull Request successfully created!`);
+    console.log(`👉 ${ghOutput}\n`);
+  } catch (prErr: any) {
+    const stderr = prErr.stderr ? prErr.stderr.toString() : prErr.message;
+    // Check if PR already exists
+    if (stderr.includes('already exists')) {
+      console.log('ℹ️ Pull Request already exists for this branch. Updating PR description...');
+      execSync(
+        `gh pr edit "${currentBranch}" --title "${title.replace(/"/g, '\\"')}" --body-file "${prFilePath}"`,
+        { stdio: 'inherit' }
+      );
+      const existingPr = execSync(`gh pr view "${currentBranch}" --json url --jq .url`, { encoding: 'utf-8' }).trim();
+      console.log(`\n🎉 Pull Request successfully updated with new experiment benchmark!`);
+      console.log(`👉 ${existingPr}\n`);
+    } else {
+      console.error(`❌ Failed to create Pull Request: ${stderr}`);
+      process.exit(1);
+    }
   }
 
   process.exit(0);

@@ -1,5 +1,4 @@
 use std::time::Instant;
-use crate::bitboard::*;
 use crate::board::Board;
 use crate::eval::{evaluate, CORNER_MASK, STATIC_WEIGHTS, X_SQUARES};
 use crate::tt::{TTFlag, TranspositionTable};
@@ -21,6 +20,7 @@ pub struct Searcher {
     pub start_time: Instant,
     pub time_limit_sec: Option<f64>,
     pub stop: bool,
+    pub killers: [[u8; 2]; 64],
 }
 
 impl Searcher {
@@ -31,6 +31,7 @@ impl Searcher {
             start_time: Instant::now(),
             time_limit_sec: None,
             stop: false,
+            killers: [[255; 2]; 64],
         }
     }
 
@@ -46,8 +47,8 @@ impl Searcher {
         self.stop
     }
 
-    /// Orders legal moves to maximize early alpha-beta cutoffs.
-    fn order_moves(&self, legal_mask: u64, tt_move: u8) -> Vec<u8> {
+    /// Orders legal moves to maximize early alpha-beta cutoffs using TT move, killers, and static weights.
+    fn order_moves(&self, legal_mask: u64, tt_move: u8, ply: usize) -> Vec<u8> {
         let mut moves = Vec::with_capacity(legal_mask.count_ones() as usize);
         let mut bits = legal_mask;
         while bits != 0 {
@@ -56,13 +57,22 @@ impl Searcher {
             bits &= bits - 1;
         }
 
+        let killer1 = if ply < 64 { self.killers[ply][0] } else { 255 };
+        let killer2 = if ply < 64 { self.killers[ply][1] } else { 255 };
+
         moves.sort_by_cached_key(|&sq| {
             if sq == tt_move {
-                return i32::MIN; // Search TT move first!
+                return -100_000; // Search TT move first!
+            }
+            if sq == killer1 {
+                return -50_000; // Primary killer move
+            }
+            if sq == killer2 {
+                return -25_000; // Secondary killer move
             }
             let is_corner = (CORNER_MASK & (1u64 << sq)) != 0;
             if is_corner {
-                return -10000;
+                return -10_000;
             }
 
             // Penalty for X-squares if corner empty
@@ -77,7 +87,7 @@ impl Searcher {
         moves
     }
 
-    /// Core Negamax alpha-beta search with Transposition Table and PVS.
+    /// Core Negamax alpha-beta search with Transposition Table, Killer Moves, and PVS.
     pub fn negamax(
         &mut self,
         board: &Board,
@@ -85,6 +95,7 @@ impl Searcher {
         mut alpha: i32,
         beta: i32,
         passed_before: bool,
+        ply: usize,
     ) -> i32 {
         self.nodes += 1;
 
@@ -92,7 +103,7 @@ impl Searcher {
             return 0;
         }
 
-        let key = self.tt.zobrist.hash(board);
+        let key = board.hash;
 
         // TT Probe
         let (tt_score, tt_move) = self.tt.probe(key, depth, alpha, beta);
@@ -115,11 +126,11 @@ impl Searcher {
             }
             let mut passed_board = board.clone();
             passed_board.pass();
-            let score = -self.negamax(&passed_board, depth, -beta, -alpha, true);
+            let score = -self.negamax(&passed_board, depth, -beta, -alpha, true, ply + 1);
             return score;
         }
 
-        let moves = self.order_moves(legal_mask, tt_move);
+        let moves = self.order_moves(legal_mask, tt_move, ply);
         let mut best_score = -INFINITY;
         let mut best_move = 255u8;
         let original_alpha = alpha;
@@ -130,13 +141,13 @@ impl Searcher {
 
             let score = if i == 0 {
                 // Search first move with full window
-                -self.negamax(&next_board, depth - 1, -beta, -alpha, false)
+                -self.negamax(&next_board, depth - 1, -beta, -alpha, false, ply + 1)
             } else {
                 // Principal Variation Search (null window test)
-                let mut s = -self.negamax(&next_board, depth - 1, -alpha - 1, -alpha, false);
+                let mut s = -self.negamax(&next_board, depth - 1, -alpha - 1, -alpha, false, ply + 1);
                 if s > alpha && s < beta {
                     // Re-search with full window
-                    s = -self.negamax(&next_board, depth - 1, -beta, -alpha, false);
+                    s = -self.negamax(&next_board, depth - 1, -beta, -alpha, false, ply + 1);
                 }
                 s
             };
@@ -153,6 +164,13 @@ impl Searcher {
                 alpha = score;
             }
             if alpha >= beta {
+                // Beta cutoff - record killer move if not the TT move
+                if ply < 64 && sq != tt_move {
+                    if self.killers[ply][0] != sq {
+                        self.killers[ply][1] = self.killers[ply][0];
+                        self.killers[ply][0] = sq;
+                    }
+                }
                 break; // Beta cutoff
             }
         }
@@ -182,6 +200,7 @@ impl Searcher {
         self.start_time = Instant::now();
         self.time_limit_sec = time_limit_sec;
         self.stop = false;
+        self.killers = [[255; 2]; 64];
 
         let legal_mask = board.legal_moves();
         if legal_mask == 0 {
@@ -201,12 +220,12 @@ impl Searcher {
         let max_depth = target_depth.max(1);
 
         for d in 1..=max_depth {
-            let score = self.negamax(board, d, -INFINITY, INFINITY, false);
+            let score = self.negamax(board, d, -INFINITY, INFINITY, false, 0);
             if self.stop && d > 1 {
                 break;
             }
 
-            let key = self.tt.zobrist.hash(board);
+            let key = board.hash;
             if let Some(entry) = self.tt.get(key) {
                 if entry.best_move < 64 {
                     overall_best_move = Some(entry.best_move);
@@ -253,7 +272,7 @@ impl Searcher {
 
             let mut next_board = board.clone();
             next_board.make_move(sq);
-            let score = -self.negamax(&next_board, depth.saturating_sub(1), -INFINITY, INFINITY, false);
+            let score = -self.negamax(&next_board, depth.saturating_sub(1), -INFINITY, INFINITY, false, 1);
             // Convert internal score to approximate disc differential for NBoard
             let disc_diff = (score as f64) / 100.0;
             candidates.push((sq, disc_diff));

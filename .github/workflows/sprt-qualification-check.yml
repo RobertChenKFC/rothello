@@ -1,0 +1,42 @@
+name: SPRT Merge Qualification Check
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [ opened, synchronize, reopened ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  verify-sprt-qualification:
+    name: SPRT Benchmark Qualification Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify SPRT Qualification
+        id: qualification
+        run: npx tsx scripts/verify-sprt-qualification.ts
+
+      - name: Auto-close on SPRT Regression
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "SPRT Qualification check failed. PR is blocked from merging to trunk."

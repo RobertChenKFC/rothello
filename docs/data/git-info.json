@@ -1,8 +1,8 @@
 {
-  "commit": "a47a09a",
-  "message": "docs: comprehensive README covering local setup, testing dashboard, and PR contribution workflow",
-  "branch": "master",
+  "commit": "059b3ce",
+  "message": "test: record SPRT experiment (-5.6 ± 89.5 Elo) for feat/incremental-zobrist-killers",
+  "branch": "feat/incremental-zobrist-killers",
   "author": "Robert Chen",
-  "isDirty": false,
-  "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/a47a09a"
+  "isDirty": true,
+  "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/059b3ce"
 }
