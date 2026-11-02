@@ -1,8 +1,8 @@
 {
-  "commit": "4126a12",
-  "message": "feat(automation): support GitHub REST API token in submit-pr",
+  "commit": "9f043e1",
+  "message": "ci: add SPRT merge qualification check workflow",
   "branch": "feat/incremental-zobrist-killers",
   "author": "Robert Chen",
   "isDirty": true,
-  "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/4126a12"
+  "githubUrl": "https://github.com/RobertChenKFC/rothello/commit/9f043e1"
 }
